@@ -1,0 +1,131 @@
+extends layouts/layout
+
+block content
+  .row.mb-5
+    .col-md-12
+      .p-5.mb-4.bg-primary-subtle.rounded-3
+        .container-fluid.py-5
+          h1.display-5.fw-bold Welcome to My Personal Blog
+          p.col-md-8.fs-4 Share your thoughts, ideas and experiences with the world.
+          if !user
+            a.btn.btn-primary.btn-lg(href="/auth/register") Get Started
+          else
+            a.btn.btn-primary.btn-lg(href="/posts") Explore Posts
+  
+  .row.mb-5
+    .col-md-8
+      h2.mb-4 Featured Posts
+      .row
+        if featuredPosts && featuredPosts.length
+          each post in featuredPosts
+            .col-md-6.mb-4
+              .card.h-100
+                .card-body
+                  h5.card-title= post.title
+                  p.card-text= post.summary || post.content.substring(0, 120) + '...'
+                  a.btn.btn-sm.btn-outline-primary(href=`/post/details/${post.post_id}`) Read More
+        else
+          .col-12
+            .alert.alert-info No featured posts available yet.
+    
+    .col-md-4
+      .card.mb-4
+        .card-header About Me
+        .card-body
+          h5.card-title My Blog Journey
+          p.card-text This is my personal space where I share my thoughts and experiences about various topics including technology, life, and more.
+          a.btn.btn-outline-primary(href="/about") Learn More
+          
+      .card
+        .card-header Categories
+        .card-body
+          .list-group.list-group-flush
+            a.list-group-item.list-group-item-action(href="#") Technology
+            a.list-group-item.list-group-item-action(href="#") Travel
+            a.list-group-item.list-group-item-action(href="#") Food
+            a.list-group-item.list-group-item-action(href="#") Lifestyle
+
+block scripts
+  script.
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('Trang home đã tải xong, kiểm tra accessToken từ cookie...');
+      
+      // Hàm lấy giá trị cookie theo tên
+      function getCookie(name) {
+        const cookieValue = document.cookie
+          .split('; ')
+          .find(row => row.startsWith(name + '='));
+        
+        if (cookieValue) {
+          return cookieValue.split('=')[1];
+        }
+        return null;
+      }
+      
+      // Lấy tất cả cookies để kiểm tra
+      console.log('Tất cả cookies:', document.cookie);
+      
+      // Thử lấy accessToken từ cookie (tên có thể là accessToken, token, hoặc jwt)
+      const accessToken = getCookie('accessToken') || getCookie('token') || getCookie('jwt');
+      
+      console.log('=== QUAN TRỌNG: GIẢI THÍCH VỀ HTTPONLY COOKIE ===');
+      console.log('Không thể lấy được accessToken từ cookie vì nó được set với thuộc tính httpOnly: true');
+      console.log('Thuộc tính httpOnly bảo mật cookie và ngăn JavaScript phía client truy cập vào nó');
+      console.log('Điều này là để bảo vệ token JWT khỏi các cuộc tấn công XSS (Cross-Site Scripting)');
+      console.log('Do đó, trong AuthController.js, token được lưu vào cookie nhưng trang home không thể đọc được');
+      console.log('GIẢI PHÁP:');
+      console.log('1. Sửa AuthController.js để không set httpOnly hoặc');
+      console.log('2. Sửa server để gửi token trong response JSON lúc login và lưu vào localStorage hoặc');
+      console.log('3. Thêm một cookie khác không httpOnly chứa account_id để JavaScript có thể đọc');
+      
+      if (accessToken) {
+        console.log('Đã tìm thấy accessToken trong cookie:', accessToken);
+        
+        // Phân tích JWT nếu có thể
+        try {
+          const tokenParts = accessToken.split('.');
+          if (tokenParts.length === 3) {
+            // Giải mã phần payload
+            const base64Url = tokenParts[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            
+            const payload = JSON.parse(jsonPayload);
+            console.log('Nội dung payload của token:', payload);
+            
+            // Kiểm tra xem có account_id không
+            if (payload.account_id) {
+              console.log('account_id từ token:', payload.account_id);
+              
+              // Lưu vào localStorage nếu chưa có
+              if (!localStorage.getItem('account_id')) {
+                localStorage.setItem('account_id', payload.account_id);
+                console.log('Đã lưu account_id vào localStorage:', payload.account_id);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Lỗi khi phân tích token:', error);
+        }
+      } else {
+        console.log('Không tìm thấy accessToken trong cookie vì nó đã được set với httpOnly: true');
+        console.log('Bạn cần sửa AuthController.js để set cookie không có httpOnly hoặc gửi token dưới dạng JSON response');
+        
+        // Kiểm tra xem có trong localStorage không
+        const localStorageToken = localStorage.getItem('accessToken');
+        if (localStorageToken) {
+          console.log('Tìm thấy accessToken trong localStorage:', localStorageToken);
+        } else {
+          console.log('Không tìm thấy accessToken trong localStorage');
+        }
+      }
+      
+      // Hiển thị tất cả items trong localStorage
+      console.log('Tất cả items trong localStorage:');
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        console.log(`- ${key}: ${localStorage.getItem(key)}`);
+      }
+    });

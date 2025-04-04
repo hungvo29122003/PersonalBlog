@@ -1,0 +1,174 @@
+extends ../layouts/layout
+
+block content
+  .row.mb-5
+    .col-lg-8.mx-auto
+      h1.mb-4 About Me
+      
+      .card.mb-5#adminProfileCard
+        .card-body
+          .row
+            .col-md-4.mb-3.mb-md-0.text-center
+              img.img-fluid.rounded-circle#adminAvatar(src="/img/profile.jpg" alt="Profile" onerror="this.src='/img/default-profile.jpg'" style="max-width: 200px; height: auto;")
+            .col-md-8
+              h3#adminName Blog Owner
+              p.lead I'm a passionate blogger and technology enthusiast with a love for sharing knowledge and experiences.
+              p I created this blog as a platform to document my journey, share my insights, and connect with like-minded individuals around the world.
+              
+              .mt-3
+                p
+                  i.fas.fa-calendar-day.me-2
+                  span#adminBirthday Date of Birth: 
+                p 
+                  i.fas.fa-map-marker-alt.me-2
+                  span#adminAddress Location: 
+                p
+                  i.fas.fa-phone.me-2
+                  span#adminPhone Phone: 
+              
+              .social-links.mt-3.d-flex
+                a.btn.btn-outline-primary.me-2(href="https://www.facebook.com/vo.phi.hung.256500" target="_blank")
+                  i.fab.fa-facebook
+                a.btn.btn-outline-info.me-2(href="#" target="_blank")
+                  i.fab.fa-twitter
+                a.btn.btn-outline-danger.me-2(href="https://www.instagram.com/hungvo851/" target="_blank")
+                  i.fab.fa-instagram
+                a.btn.btn-outline-dark.me-2(href="https://github.com/hungvo29122003" target="_blank")
+                  i.fab.fa-github
+      
+      .row.mb-5
+        .col-12
+          h2.mb-4 My Story
+          p This blog was born out of my passion for technology and sharing knowledge. I've always been fascinated by how technology shapes our world and wanted to create a space where I could document my experiences and insights.
+          p When I'm not writing for this blog, I enjoy hiking, photography, and experimenting with new technologies. I believe in continuous learning and growth, and this blog is a reflection of that journey.
+          p I hope that through my writing, I can inspire others to pursue their interests and share their unique perspectives with the world.
+      
+      .row.mb-5
+        .col-12
+          h2.mb-4 Blog Mission
+          .card.border-0.bg-light
+            .card-body
+              blockquote.blockquote mb-0
+                p To create valuable content that educates, inspires, and entertains readers while building a community of passionate learners and creators.
+      
+      .row
+        .col-md-6.mb-4
+          .card.h-100
+            .card-header Topics I Write About
+            .card-body
+              ul.list-group.list-group-flush
+                li.list-group-item Technology & Gadgets
+                li.list-group-item Web Development
+                li.list-group-item Personal Growth
+                li.list-group-item Travel Experiences
+        
+        .col-md-6.mb-4
+          .card.h-100
+            .card-header Contact Me
+            .card-body
+              p If you have any questions, feedback, or collaboration ideas, feel free to reach out to me:
+              ul.list-unstyled
+                li.mb-2
+                  i.fas.fa-envelope.me-2
+                  | Email: example@example.com
+                li.mb-2
+                  i.fas.fa-phone.me-2
+                  span#contactPhone Phone: 
+                li.mb-2
+                  i.fas.fa-map-marker-alt.me-2
+                  span#contactAddress Location: Vietnam
+                li
+                  i.fas.fa-comment.me-2
+                  a.text-decoration-none(href="/contact") Contact Form
+
+block scripts
+  script.
+    document.addEventListener('DOMContentLoaded', function() {
+      loadAdminData();
+    });
+    
+    async function loadAdminData() {
+      try {
+        // Hiển thị trạng thái loading nếu cần
+        console.log('Fetching admin data...');
+        
+        // Gọi API lấy dữ liệu admin
+        const response = await fetch('/admin/accounts');
+        console.log('API Response:', response);
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+        
+        const adminData = await response.json();
+        console.log('Admin data received:', adminData);
+        
+        // Nếu có dữ liệu admin
+        if (adminData && adminData.length > 0) {
+          const admin = adminData[0]; // Lấy admin đầu tiên
+          console.log('Admin info:', admin);
+          
+          // Lưu admin_id vào localStorage
+          localStorage.setItem('admin_id', admin.admin_id);
+          console.log('Admin ID saved to localStorage:', admin.admin_id);
+          
+          // Cập nhật giao diện
+          updateUI(admin);
+        } else {
+          console.warn('No admin data found or empty array returned');
+        }
+      } catch (error) {
+        console.error('Error loading admin data:', error);
+      }
+    }
+    
+    // Hàm cập nhật giao diện với thông tin admin
+    function updateUI(admin) {
+      // Cập nhật tên
+      const nameElement = document.getElementById('adminName');
+      if (nameElement && admin.full_name) {
+        nameElement.textContent = admin.full_name;
+        console.log('Updated admin name:', admin.full_name);
+      }
+      
+      // Cập nhật avatar
+      const avatarElement = document.getElementById('adminAvatar');
+      if (avatarElement && admin.avatar) {
+        avatarElement.src = admin.avatar;
+        console.log('Updated admin avatar:', admin.avatar);
+      }
+      
+      // Cập nhật ngày sinh
+      const birthdayElement = document.getElementById('adminBirthday');
+      if (birthdayElement && admin.date_of_birth) {
+        const birthDate = new Date(admin.date_of_birth);
+        birthdayElement.textContent = `Date of Birth: ${birthDate.toLocaleDateString()}`;
+        console.log('Updated admin birthday:', birthDate.toLocaleDateString());
+      }
+      
+      // Cập nhật địa chỉ
+      const addressElement = document.getElementById('adminAddress');
+      if (addressElement && admin.address) {
+        addressElement.textContent = `Location: ${admin.address}`;
+        console.log('Updated admin address:', admin.address);
+      }
+      
+      // Cập nhật số điện thoại
+      const phoneElement = document.getElementById('adminPhone');
+      if (phoneElement && admin.phone_number) {
+        phoneElement.textContent = `Phone: ${admin.phone_number}`;
+        console.log('Updated admin phone:', admin.phone_number);
+      }
+      
+      // Cập nhật địa chỉ ở mục liên hệ
+      const contactAddressElement = document.getElementById('contactAddress');
+      if (contactAddressElement && admin.address) {
+        contactAddressElement.textContent = admin.address;
+      }
+      
+      // Cập nhật số điện thoại ở mục liên hệ
+      const contactPhoneElement = document.getElementById('contactPhone');
+      if (contactPhoneElement && admin.phone_number) {
+        contactPhoneElement.textContent = admin.phone_number;
+      }
+    } 

@@ -1,0 +1,543 @@
+extends ../layouts/layout
+
+block content
+  .container.py-5
+    .row.mb-4
+      .col
+        h1.display-5 Bài Viết Blog
+      .col-auto
+        if user && user.role === 'admin'
+          a.btn.btn-primary.px-4(href="/post/create")
+            i.fas.fa-plus.me-2
+            | Tạo bài viết mới
+    
+    // Hiển thị flash messages
+    if messages && messages.success
+      .alert.alert-success.mb-4= messages.success
+    if messages && messages.error
+      .alert.alert-danger.mb-4= messages.error
+    
+    if posts && posts.length > 0
+      .row.row-cols-1.row-cols-md-2.row-cols-lg-3.g-4.mb-5
+        each post in posts
+          .col
+            .card.h-100.border-0.shadow-sm
+              if post.image
+                img.card-img-top(src=post.image alt=post.title style="height: 200px; object-fit: cover;")
+              .card-body
+                h5.card-title= post.title
+                
+                .card-text.text-muted.small.mb-3
+                  i.fas.fa-calendar-alt.me-1
+                  - const date = new Date(post.create_at)
+                  span= date.toLocaleDateString('vi-VN')
+                  
+                  if post.fullname
+                    span.ms-2.me-2 |
+                    i.fas.fa-user.me-1
+                    span= post.fullname
+                
+                p.card-text.mb-3.text-truncate= post.content
+                
+                a.btn.btn-outline-primary.btn-sm(href=`/posts/details/${post.post_id}`) Xem chi tiết
+                
+                if user && user.role === 'admin'
+                  .mt-3.d-flex.gap-2
+                    a.btn.btn-sm.btn-outline-secondary edit-post-btn(href=`/post/edit/${post.post_id}`)
+                      i.fas.fa-edit.me-1
+                      | Sửa
+                    button.btn.btn-sm.btn-outline-danger delete-post-btn(type="button" data-post-id=post.post_id)
+                      i.fas.fa-trash.me-1
+                      | Xóa
+      
+      if posts.length >= 10
+        .d-flex.justify-content-center.mt-4
+          nav(aria-label="Page navigation")
+            ul.pagination
+              li.page-item.disabled
+                a.page-link(href="#" tabindex="-1" aria-disabled="true") Trước
+              li.page-item.active
+                a.page-link(href="#") 1
+              li.page-item
+                a.page-link(href="#") 2
+              li.page-item
+                a.page-link(href="#") 3
+              li.page-item
+                a.page-link(href="#") Sau
+    else
+      .row.justify-content-center
+        .col-md-8.text-center
+          .card.border-0.shadow-sm.p-5
+            i.fas.fa-newspaper.fa-4x.text-muted.mb-3
+            h3.mb-3 Chưa có bài viết nào
+            p.text-muted Hiện tại chưa có bài viết nào trong blog. Hãy tạo bài viết đầu tiên!
+            if user && user.role === 'admin'
+              a.btn.btn-primary.mt-2(href="/post/create") Tạo bài viết mới
+
+block scripts
+  script.
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('DOM đã sẵn sàng, khởi tạo trang');
+      
+      // Thiết lập trạng thái ban đầu
+      initPage();
+      
+      // Gọi API để lấy danh sách bài viết
+      fetchPosts();
+      
+      // Xử lý nút xóa bài viết
+      attachDeleteListeners();
+      
+      // Xử lý nút xem chi tiết
+      attachViewDetailsListeners();
+      
+      // Xử lý nút chỉnh sửa bài viết
+      attachEditListeners();
+      
+      // Hàm khởi tạo trang
+      function initPage() {
+        console.log('Khởi tạo trang posts');
+        
+        // Kiểm tra xem container bài viết có sẵn không
+        const postsContainer = document.querySelector('.row.row-cols-1.row-cols-md-2.row-cols-lg-3.g-4.mb-5');
+        const emptyState = document.querySelector('.row.justify-content-center');
+        
+        console.log('Container bài viết:', postsContainer ? 'Đã tìm thấy' : 'Không tìm thấy');
+        console.log('Empty state:', emptyState ? 'Đã tìm thấy' : 'Không tìm thấy');
+        
+        // Nếu không có container nào, hiển thị thông báo loading
+        if (!postsContainer && !emptyState) {
+          const mainContainer = document.querySelector('.container.py-5');
+          if (mainContainer) {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'text-center my-5';
+            loadingDiv.id = 'loading-indicator';
+            loadingDiv.innerHTML = `
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <p class="mt-2">Đang tải danh sách bài viết...</p>
+            `;
+            
+            // Tìm vị trí để chèn vào (sau tiêu đề)
+            const titleRow = mainContainer.querySelector('.row.mb-4');
+            if (titleRow) {
+              mainContainer.insertBefore(loadingDiv, titleRow.nextSibling);
+            } else {
+              mainContainer.appendChild(loadingDiv);
+            }
+          }
+        }
+        
+        // Kiểm tra xem người dùng có đăng nhập không và có phải admin không
+        const userLoggedIn = document.body.classList.contains('user-logged-in');
+        const userIsAdmin = userLoggedIn && (document.body.classList.contains('user-admin') || document.body.classList.contains('role-admin'));
+        // Kiểm tra từ biến server
+        const isAdminFromServer = !!document.querySelector('a.btn.btn-primary.px-4[href="/post/create"]');
+        const isAdmin = userIsAdmin || isAdminFromServer;
+        
+        console.log('User logged in:', userLoggedIn);
+        console.log('User is admin (từ class):', userIsAdmin);
+        console.log('User is admin (từ server):', isAdminFromServer);
+        console.log('Kết luận: User is admin:', isAdmin);
+        
+        // Ẩn/hiện nút tạo bài viết mới dựa vào quyền admin
+        const createButton = document.querySelector('a.btn.btn-primary.px-4[href="/post/create"]');
+        if (createButton) {
+          createButton.style.display = isAdmin ? 'inline-block' : 'none';
+        }
+        
+        // Hiển thị các nút admin nếu người dùng là admin
+        showAdminButtons();
+      }
+      
+      // Gọi API để lấy danh sách bài viết
+      function fetchPosts() {
+        console.log('Gọi API lấy danh sách bài viết...');
+        
+        fetch('/post/')
+          .then(response => {
+            console.log('API response status:', response.status);
+            console.log('API response headers:', response.headers);
+            return response.json();
+          })
+          .then(posts => {
+            console.log('Posts fetched from API:', posts);
+            
+            // Kiểm tra xem posts có phải là array không
+            if (!posts) {
+              console.error('API không trả về dữ liệu');
+              showErrorMessage('Không có dữ liệu bài viết');
+              return;
+            }
+            
+            if (!Array.isArray(posts)) {
+              console.error('Dữ liệu trả về không phải là mảng:', posts);
+              
+              // Nếu posts có thuộc tính message, thử hiển thị
+              if (posts.message) {
+                showErrorMessage(posts.message);
+                return;
+              }
+              
+              // Nếu là object nhưng không có thuộc tính message, thử chuyển sang mảng
+              if (typeof posts === 'object') {
+                const postsArray = Object.values(posts);
+                console.log('Đã chuyển object thành mảng:', postsArray);
+                
+                if (postsArray.length > 0) {
+                  displayPosts(postsArray);
+                  return;
+                }
+              }
+              
+              showEmptyState();
+              return;
+            }
+            
+            if (posts.length === 0) {
+              console.log('Không có bài viết nào');
+              showEmptyState();
+              return;
+            }
+            
+            // Hiển thị danh sách bài viết
+            console.log('Chuẩn bị hiển thị', posts.length, 'bài viết');
+            displayPosts(posts);
+          })
+          .catch(error => {
+            console.error('Error fetching posts:', error);
+            showErrorMessage('Đã xảy ra lỗi khi tải danh sách bài viết: ' + error.message);
+          });
+      }
+      
+      // Hiển thị danh sách bài viết
+      function displayPosts(posts) {
+        console.log('Bắt đầu hiển thị bài viết');
+        
+        // Xóa loading indicator nếu có
+        removeLoadingIndicator();
+        
+        // Kiểm tra quyền admin
+        const userLoggedIn = document.body.classList.contains('user-logged-in');
+        const userIsAdmin = userLoggedIn && (document.body.classList.contains('user-admin') || document.body.classList.contains('role-admin'));
+        // Kiểm tra từ biến server
+        const isAdminFromServer = !!document.querySelector('a.btn.btn-primary.px-4[href="/post/create"]');
+        const isAdmin = userIsAdmin || isAdminFromServer;
+        
+        console.log('User logged in:', userLoggedIn, 'User is admin (từ class):', userIsAdmin);
+        console.log('User is admin (từ server):', isAdminFromServer);
+        console.log('Kết luận: User is admin:', isAdmin);
+        
+        // Tìm container của bài viết
+        let postsContainer = document.querySelector('.row.row-cols-1.row-cols-md-2.row-cols-lg-3.g-4.mb-5');
+        
+        // Nếu không tìm thấy container, tạo container mới
+        if (!postsContainer) {
+          console.log('Không tìm thấy container bài viết, tạo mới');
+          const mainContainer = document.querySelector('.container.py-5');
+          
+          if (!mainContainer) {
+            console.error('Không tìm thấy container chính');
+            return;
+          }
+          
+          postsContainer = document.createElement('div');
+          postsContainer.className = 'row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-5';
+          
+          // Tìm vị trí để chèn vào
+          const emptyState = document.querySelector('.row.justify-content-center');
+          if (emptyState) {
+            mainContainer.insertBefore(postsContainer, emptyState);
+          } else {
+            mainContainer.appendChild(postsContainer);
+          }
+        }
+        
+        // Lấy phần tử emptyState
+        const emptyState = document.querySelector('.row.justify-content-center');
+        if (emptyState) {
+          emptyState.style.display = 'none';
+        }
+        
+        // Hiển thị container bài viết
+        postsContainer.style.display = 'flex';
+        
+        // Xóa nội dung trong container
+        postsContainer.innerHTML = '';
+        console.log('Đã xóa nội dung cũ trong container');
+        
+        // Đếm số bài viết hiển thị thành công
+        let successCount = 0;
+        
+        // Xử lý từng bài viết
+        posts.forEach((post, index) => {
+          console.log(`Xử lý bài viết ${index + 1}/${posts.length}:`, post.title || 'Không có tiêu đề');
+          
+          if (!post.post_id) {
+            console.warn('Bài viết không có post_id, bỏ qua');
+            return;
+          }
+          
+          // Xử lý ngày tháng
+          let formattedDate = 'Không có ngày';
+          if (post.create_at || post.created_at) {
+            try {
+              const postDate = new Date(post.create_at || post.created_at);
+              formattedDate = postDate.toLocaleDateString('vi-VN');
+            } catch (e) {
+              console.warn('Lỗi định dạng ngày:', e);
+            }
+          }
+          
+          try {
+            // Tạo HTML cho bài viết
+            const postColumn = document.createElement('div');
+            postColumn.className = 'col';
+            
+            // Hiển thị phần chỉnh sửa chỉ khi user là admin
+            const adminActionsHTML = isAdmin ? `
+              <div class="mt-3 d-flex gap-2 admin-actions">
+                <a class="btn btn-sm btn-outline-secondary edit-post-btn" href="/post/edit/${post.post_id}">
+                  <i class="fas fa-edit me-1"></i>
+                  Sửa
+                </a>
+                <button class="btn btn-sm btn-outline-danger delete-post-btn" type="button" data-post-id="${post.post_id}">
+                  <i class="fas fa-trash me-1"></i>
+                  Xóa
+                </button>
+              </div>
+            ` : '';
+            
+            postColumn.innerHTML = `
+              <div class="card h-100 border-0 shadow-sm">
+                ${post.image ? `<img class="card-img-top" src="${post.image}" alt="${post.title || 'Bài viết'}" style="height: 200px; object-fit: cover;">` : ''}
+                <div class="card-body">
+                  <h5 class="card-title">${post.title || 'Không có tiêu đề'}</h5>
+                  
+                  <div class="card-text text-muted small mb-3">
+                    <i class="fas fa-calendar-alt me-1"></i>
+                    <span>${formattedDate}</span>
+                    
+                    ${post.fullname ? `
+                      <span class="ms-2 me-2">|</span>
+                      <i class="fas fa-user me-1"></i>
+                      <span>${post.fullname}</span>
+                    ` : ''}
+                  </div>
+                  
+                  <p class="card-text mb-3 text-truncate">${post.content || 'Không có nội dung'}</p>
+                  
+                  <a class="btn btn-outline-primary btn-sm view-details-btn" href="/posts/details/${post.post_id}" data-post-id="${post.post_id}">
+                    Xem chi tiết
+                    <i class="fas fa-arrow-right ms-1"></i>
+                  </a>
+                  
+                  ${adminActionsHTML}
+                </div>
+              </div>
+            `;
+            
+            // Thêm bài viết vào container
+            postsContainer.appendChild(postColumn);
+            successCount++;
+            
+          } catch (e) {
+            console.error(`Lỗi khi hiển thị bài viết ${index + 1}:`, e);
+          }
+        });
+        
+        console.log(`Đã hiển thị ${successCount}/${posts.length} bài viết`);
+        
+        // Thêm event listeners cho nút xóa
+        attachDeleteListeners();
+        
+        // Thêm event listeners cho nút xem chi tiết
+        attachViewDetailsListeners();
+        
+        // Thêm event listeners cho nút chỉnh sửa
+        attachEditListeners();
+        
+        // Hiển thị các nút admin nếu người dùng là admin
+        showAdminButtons();
+      }
+      
+      // Kiểm tra quyền admin
+      function showAdminButtons() {
+        // Kiểm tra xem người dùng có phải là admin không
+        const userLoggedIn = document.body.classList.contains('user-logged-in');
+        const userIsAdmin = userLoggedIn && (document.body.classList.contains('user-admin') || document.body.classList.contains('role-admin'));
+        
+        // Kiểm tra thêm từ session hoặc từ biến truyền từ server
+        const isAdminFromServer = !!document.querySelector('a.btn.btn-primary.px-4[href="/post/create"]');
+        
+        const isAdmin = userIsAdmin || isAdminFromServer;
+        console.log('User is admin (từ class):', userIsAdmin);
+        console.log('User is admin (từ server):', isAdminFromServer);
+        console.log('Kết luận: User is admin:', isAdmin);
+        
+        // Lấy tất cả các nút admin
+        const adminActions = document.querySelectorAll('.admin-actions');
+        
+        adminActions.forEach(el => {
+          el.style.display = (isAdmin) ? 'flex' : 'none';
+        });
+        
+        console.log(`${adminActions.length} nút admin được ${(isAdmin) ? 'hiện' : 'ẩn'}`);
+      }
+      
+      // Hiển thị trạng thái không có bài viết
+      function showEmptyState() {
+        // Xóa loading indicator nếu có
+        removeLoadingIndicator();
+        
+        const postsContainer = document.querySelector('.row.row-cols-1.row-cols-md-2.row-cols-lg-3.g-4.mb-5');
+        if (postsContainer) {
+          postsContainer.style.display = 'none';
+        }
+        
+        // Hiển thị thông báo không có bài viết
+        const emptyState = document.querySelector('.row.justify-content-center');
+        if (emptyState) {
+          emptyState.style.display = 'flex';
+        }
+      }
+      
+      // Hiển thị thông báo lỗi
+      function showErrorMessage(message) {
+        const alertContainer = document.createElement('div');
+        alertContainer.className = 'alert alert-danger mb-4';
+        alertContainer.textContent = message;
+        
+        const container = document.querySelector('.container.py-5');
+        const existingAlert = container.querySelector('.alert.alert-danger');
+        
+        if (existingAlert) {
+          existingAlert.textContent = message;
+        } else {
+          const rowTitle = container.querySelector('.row.mb-4');
+          container.insertBefore(alertContainer, rowTitle.nextSibling);
+        }
+      }
+      
+      // Thêm event listeners cho nút xóa
+      function attachDeleteListeners() {
+        console.log('Đang thêm listeners cho các nút xóa bài viết');
+        const deleteButtons = document.querySelectorAll('.delete-post-btn');
+        console.log(`Tìm thấy ${deleteButtons.length} nút xóa`);
+        
+        deleteButtons.forEach(button => {
+          button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const postId = this.getAttribute('data-post-id');
+            
+            if (confirm('Bạn có chắc chắn muốn xóa bài viết này?')) {
+              console.log(`Đang xóa bài viết ${postId}`);
+              
+              fetch(`/post/${postId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              })
+              .then(response => {
+                console.log('Xóa bài viết response:', response.status);
+                if (!response.ok) {
+                  return response.json().then(data => {
+                    throw new Error(data.message || `Lỗi khi xóa bài viết: ${response.status}`);
+                  });
+                }
+                return response.json();
+              })
+              .then(data => {
+                console.log('Kết quả xóa bài viết:', data);
+                alert(data.message || 'Xóa bài viết thành công!');
+                // Reload trang sau khi xóa thành công
+                window.location.reload();
+              })
+              .catch(error => {
+                console.error('Error deleting post:', error);
+                alert('Đã xảy ra lỗi khi xóa bài viết: ' + error.message);
+              });
+            }
+          });
+        });
+      }
+      
+      // Thêm event listeners cho nút xem chi tiết
+      function attachViewDetailsListeners() {
+        console.log('Đang thêm listeners cho các nút xem chi tiết');
+        const detailButtons = document.querySelectorAll('.view-details-btn');
+        console.log(`Tìm thấy ${detailButtons.length} nút xem chi tiết`);
+        
+        detailButtons.forEach(button => {
+          button.addEventListener('click', function(e) {
+            // Ngăn chặn hành vi mặc định để xử lý thao tác lưu trước
+            e.preventDefault();
+            
+            // Lấy post_id từ thuộc tính data-post-id
+            const postId = this.getAttribute('data-post-id');
+            
+            // Lưu post_id vào localStorage
+            console.log(`Lưu post_id ${postId} vào localStorage`);
+            localStorage.setItem('current_post_id', postId);
+            
+            // Sau khi lưu xong, chuyển đến trang chi tiết
+            window.location.href = this.href;
+          });
+        });
+      }
+      
+      // Thêm event listeners cho nút chỉnh sửa bài viết
+      function attachEditListeners() {
+        console.log('Đang thêm listeners cho các nút chỉnh sửa bài viết');
+        const editButtons = document.querySelectorAll('.edit-post-btn');
+        console.log(`Tìm thấy ${editButtons.length} nút chỉnh sửa bài viết`);
+        
+        editButtons.forEach(button => {
+          button.addEventListener('click', function(e) {
+            // Ngăn chặn hành vi mặc định
+            e.preventDefault();
+            
+            // Tìm thẻ cha chứa thông tin bài viết
+            const cardElement = this.closest('.card');
+            if (!cardElement) {
+              console.error('Không tìm thấy card element chứa thông tin bài viết');
+              window.location.href = this.href; // Chuyển trang như bình thường
+              return;
+            }
+            
+            // Lấy post_id từ URL
+            const postId = this.href.split('/').pop();
+            console.log('post_id lấy được từ href:', postId);
+            
+            // Lấy thông tin bài viết
+            const postData = {
+              post_id: postId,
+              title: cardElement.querySelector('.card-title')?.textContent || '',
+              content: cardElement.querySelector('.card-text.mb-3')?.textContent || '',
+              image: cardElement.querySelector('.card-img-top')?.src || ''
+            };
+            
+            console.log('Thông tin bài viết cần chỉnh sửa:', postData);
+            
+            // Lưu thông tin bài viết vào localStorage
+            localStorage.setItem('current_post_id', postId);
+            localStorage.setItem('edit_post_data', JSON.stringify(postData));
+            console.log('Đã lưu thông tin bài viết vào localStorage');
+            
+            // Chuyển đến trang chỉnh sửa
+            window.location.href = this.href;
+          });
+        });
+      }
+      
+      // Xóa loading indicator
+      function removeLoadingIndicator() {
+        const loadingIndicator = document.getElementById('loading-indicator');
+        if (loadingIndicator) {
+          console.log('Xóa loading indicator');
+          loadingIndicator.remove();
+        }
+      }
+    }); 

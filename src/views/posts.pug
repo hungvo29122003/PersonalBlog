@@ -1,0 +1,254 @@
+extends layouts/layout
+
+block content
+  .row
+    .col-md-9
+      h1.mb-4 Blog Posts
+      
+      if user && user.role === 'admin'
+        .mb-4
+          a.btn.btn-success(href="/post/create")
+            i.fas.fa-plus.me-2
+            | Create New Post
+      
+      #postsContainer.row
+        // Bài viết sẽ được tải và hiển thị ở đây
+        
+      #paginationContainer.mt-4
+        // Phân trang sẽ được tạo ở đây
+    
+    .col-md-3
+      .card.mb-4
+        .card-header Search
+        .card-body
+          .input-group
+            input#searchInput.form-control(type="text" placeholder="Search posts...")
+            button#searchBtn.btn.btn-outline-primary(type="button")
+              i.fas.fa-search
+      
+      .card.mb-4
+        .card-header Categories
+        .card-body
+          .list-group.list-group-flush
+            a.list-group-item.list-group-item-action(href="javascript:void(0)" data-category="tech") Technology
+            a.list-group-item.list-group-item-action(href="javascript:void(0)" data-category="travel") Travel
+            a.list-group-item.list-group-item-action(href="javascript:void(0)" data-category="food") Food
+            a.list-group-item.list-group-item-action(href="javascript:void(0)" data-category="lifestyle") Lifestyle
+      
+      .card
+        .card-header Recent Posts
+        .card-body#recentPostsContainer
+          p.mb-0 Đang tải bài viết gần đây...
+
+block scripts
+  script.
+    document.addEventListener('DOMContentLoaded', function() {
+      // Biến toàn cục để lưu trữ dữ liệu bài viết
+      let allPosts = [];
+      let currentPage = 1;
+      const postsPerPage = 6; // Số bài viết trên mỗi trang
+      
+      // Tải tất cả bài viết
+      loadAllPosts();
+      
+      // Xử lý tìm kiếm
+      document.getElementById('searchBtn').addEventListener('click', function() {
+        const searchTerm = document.getElementById('searchInput').value.trim().toLowerCase();
+        filterPosts(searchTerm);
+      });
+      
+      document.getElementById('searchInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          const searchTerm = this.value.trim().toLowerCase();
+          filterPosts(searchTerm);
+        }
+      });
+      
+      // Xử lý lọc theo danh mục
+      document.querySelectorAll('.list-group-item-action[data-category]').forEach(item => {
+        item.addEventListener('click', function(e) {
+          e.preventDefault();
+          const category = this.getAttribute('data-category');
+          filterPostsByCategory(category);
+          
+          // Đánh dấu danh mục đang chọn
+          document.querySelectorAll('.list-group-item-action').forEach(el => {
+            el.classList.remove('active');
+          });
+          this.classList.add('active');
+        });
+      });
+      
+      // Hàm tải tất cả bài viết
+      function loadAllPosts() {
+        const postsContainer = document.getElementById('postsContainer');
+        postsContainer.innerHTML = '<div class="col-12 text-center py-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+        
+        fetch('/post')
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Network response was not ok');
+            }
+            return response.json();
+          })
+          .then(data => {
+            allPosts = data;
+            renderPosts(allPosts);
+            
+            // Hiển thị 5 bài viết gần đây
+            renderRecentPosts(allPosts.slice(0, 5));
+          })
+          .catch(error => {
+            console.error('Error fetching posts:', error);
+            postsContainer.innerHTML = `
+              <div class="col-12">
+                <div class="alert alert-danger">
+                  <i class="fas fa-exclamation-circle me-2"></i>
+                  Không thể tải bài viết. Vui lòng thử lại sau.
+                </div>
+              </div>
+            `;
+          });
+      }
+      
+      // Lọc bài viết theo từ khóa tìm kiếm
+      function filterPosts(searchTerm) {
+        if (!searchTerm) {
+          renderPosts(allPosts);
+          return;
+        }
+        
+        const filteredPosts = allPosts.filter(post => {
+          return post.title.toLowerCase().includes(searchTerm) || 
+                 (post.content && post.content.toLowerCase().includes(searchTerm)) ||
+                 (post.summary && post.summary.toLowerCase().includes(searchTerm));
+        });
+        
+        renderPosts(filteredPosts);
+      }
+      
+      // Lọc bài viết theo danh mục
+      function filterPostsByCategory(category) {
+        if (!category) {
+          renderPosts(allPosts);
+          return;
+        }
+        
+        const filteredPosts = allPosts.filter(post => post.category === category);
+        renderPosts(filteredPosts);
+      }
+      
+      // Hiển thị danh sách bài viết
+      function renderPosts(posts) {
+        const postsContainer = document.getElementById('postsContainer');
+        const paginationContainer = document.getElementById('paginationContainer');
+        
+        if (!posts || posts.length === 0) {
+          postsContainer.innerHTML = `
+            <div class="col-12">
+              <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                Không có bài viết nào.
+              </div>
+            </div>
+          `;
+          paginationContainer.innerHTML = '';
+          return;
+        }
+        
+        // Tính toán số trang
+        const totalPages = Math.ceil(posts.length / postsPerPage);
+        if (currentPage > totalPages) {
+          currentPage = 1;
+        }
+        
+        // Lấy bài viết cho trang hiện tại
+        const startIndex = (currentPage - 1) * postsPerPage;
+        const endIndex = startIndex + postsPerPage;
+        const currentPosts = posts.slice(startIndex, endIndex);
+        
+        // Tạo HTML cho các bài viết
+        let postsHTML = '';
+        currentPosts.forEach(post => {
+          postsHTML += `
+            <div class="col-md-6 mb-4">
+              <div class="card h-100">
+                ${post.image_url ? `<img class="card-img-top" src="${post.image_url}" alt="${post.title}">` : ''}
+                <div class="card-body">
+                  <h5 class="card-title">${post.title}</h5>
+                  <p class="text-muted small">
+                    <i class="far fa-calendar me-1"></i>
+                    ${new Date(post.create_at || Date.now()).toLocaleDateString()}
+                    ${post.author ? `<span class="ms-3"><i class="far fa-user me-1"></i>${post.author}</span>` : ''}
+                  </p>
+                  <p class="card-text">${post.summary || (post.content ? post.content.substring(0, 100) + '...' : 'No content')}</p>
+                </div>
+                <div class="card-footer bg-transparent border-top-0">
+                  <a class="btn btn-outline-primary btn-sm" href="/post/details/${post.post_id}">Read More</a>
+                  ${post.likes_count ? `<span class="ms-3 text-muted"><i class="far fa-heart me-1"></i>${post.likes_count}</span>` : ''}
+                </div>
+              </div>
+            </div>
+          `;
+        });
+        
+        postsContainer.innerHTML = postsHTML;
+        
+        // Tạo phân trang
+        let paginationHTML = '';
+        if (totalPages > 1) {
+          paginationHTML = `
+            <nav>
+              <ul class="pagination">
+                ${currentPage > 1 ? `<li class="page-item"><a class="page-link" href="javascript:void(0)" data-page="${currentPage - 1}">Previous</a></li>` : ''}
+                
+                ${Array.from({ length: totalPages }, (_, i) => i + 1).map(page => 
+                  `<li class="page-item ${page === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="javascript:void(0)" data-page="${page}">${page}</a>
+                  </li>`
+                ).join('')}
+                
+                ${currentPage < totalPages ? `<li class="page-item"><a class="page-link" href="javascript:void(0)" data-page="${currentPage + 1}">Next</a></li>` : ''}
+              </ul>
+            </nav>
+          `;
+        }
+        
+        paginationContainer.innerHTML = paginationHTML;
+        
+        // Thêm sự kiện cho các liên kết phân trang
+        document.querySelectorAll('.pagination .page-link').forEach(link => {
+          link.addEventListener('click', function(e) {
+            e.preventDefault();
+            currentPage = parseInt(this.getAttribute('data-page'));
+            renderPosts(posts);
+            // Cuộn lên đầu danh sách bài viết
+            document.getElementById('postsContainer').scrollIntoView({ behavior: 'smooth' });
+          });
+        });
+      }
+      
+      // Hiển thị bài viết gần đây
+      function renderRecentPosts(posts) {
+        const recentPostsContainer = document.getElementById('recentPostsContainer');
+        
+        if (!posts || posts.length === 0) {
+          recentPostsContainer.innerHTML = '<p class="mb-0">Không có bài viết gần đây.</p>';
+          return;
+        }
+        
+        let recentPostsHTML = '';
+        posts.forEach(post => {
+          recentPostsHTML += `
+            <div class="mb-3">
+              <a class="text-decoration-none" href="/post/details/${post.post_id}">
+                <h6 class="mb-0">${post.title}</h6>
+              </a>
+              <small class="text-muted">${new Date(post.create_at || Date.now()).toLocaleDateString()}</small>
+            </div>
+          `;
+        });
+        
+        recentPostsContainer.innerHTML = recentPostsHTML;
+      }
+    });

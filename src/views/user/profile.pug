@@ -1,0 +1,142 @@
+extends ../layouts/layout
+
+block content
+  if user
+    .row
+      .col-lg-4.mb-4
+        .card.border-0.shadow
+          .card-header.bg-primary.text-white Profile
+          .card-body.text-center
+            if user.avatar
+              img.img-fluid.rounded-circle.mb-3(src=user.avatar alt="User Avatar" style="width: 150px; height: 150px; object-fit: cover;")
+            else
+              .bg-light.rounded-circle.mx-auto.d-flex.align-items-center.justify-content-center.mb-3(style="width: 150px; height: 150px;")
+                i.fas.fa-user.fa-4x.text-secondary
+            
+            h3= user.fullname || user.username
+            p.text-muted= user.bio || 'No bio provided'
+            
+            if user.role === 'admin'
+              span.badge.bg-danger.mb-3 Admin
+            else
+              span.badge.bg-info.mb-3 Member
+            
+            p.mb-2
+              i.fas.fa-envelope.me-2
+              | #{user.email}
+            
+            p.mb-2
+              i.fas.fa-calendar.me-2
+              | Joined: #{new Date(user.created_at).toLocaleDateString()}
+            
+            .mt-3
+              button.btn.btn-primary.me-2(data-bs-toggle="modal" data-bs-target="#editProfileModal")
+                i.fas.fa-edit.me-1
+                | Edit Profile
+              button.btn.btn-outline-secondary(data-bs-toggle="modal" data-bs-target="#changePasswordModal")
+                i.fas.fa-key.me-1
+                | Change Password
+      
+      .col-lg-8
+        // User activity
+        .card.border-0.shadow.mb-4
+          .card-header.bg-primary.text-white My Posts
+          .card-body
+            if userPosts && userPosts.length
+              each post in userPosts
+                .card.mb-3
+                  .card-body
+                    .d-flex.justify-content-between.align-items-center
+                      h5.card-title.mb-0
+                        a.text-decoration-none(href=`/post/details/${post.post_id}`)= post.title
+                      small.text-muted= new Date(post.create_at).toLocaleDateString()
+                    p.card-text.mt-2= post.summary || post.content.substring(0, 100) + '...'
+                    .d-flex
+                      a.btn.btn-sm.btn-outline-primary.me-2(href=`/post/edit/${post.post_id}`)
+                        i.fas.fa-edit.me-1
+                        | Edit
+                      button.btn.btn-sm.btn-outline-danger.delete-post-btn(data-post-id=post.post_id)
+                        i.fas.fa-trash.me-1
+                        | Delete
+                      if post.likes_count
+                        span.ms-auto.text-muted
+                          i.far.fa-heart.me-1
+                          | #{post.likes_count} likes
+            else
+              .alert.alert-info You haven't created any posts yet.
+              a.btn.btn-primary.mt-2(href="/post/create") Create Your First Post
+        
+        // User comments
+        .card.border-0.shadow
+          .card-header.bg-primary.text-white My Comments
+          .card-body
+            if userComments && userComments.length
+              each comment in userComments
+                .card.mb-3
+                  .card-body
+                    p.card-text= comment.content
+                    .d-flex.justify-content-between.align-items-center
+                      small.text-muted
+                        | On post: 
+                        a.text-decoration-none(href=`/post/details/${comment.post_id}`)= comment.post_title
+                      small.text-muted= new Date(comment.created_at).toLocaleDateString()
+                    button.btn.btn-sm.btn-outline-danger.mt-2.delete-comment-btn(data-comment-id=comment.comment_id)
+                      i.fas.fa-trash.me-1
+                      | Delete
+            else
+              .alert.alert-info You haven't commented on any posts yet.
+  else
+    .alert.alert-danger Please log in to view your profile.
+    a.btn.btn-primary.mt-2(href="/auth/login") Login
+
+  // Edit Profile Modal
+  .modal.fade#editProfileModal(tabindex="-1" aria-labelledby="editProfileModalLabel" aria-hidden="true")
+    .modal-dialog
+      .modal-content
+        .modal-header
+          h5.modal-title#editProfileModalLabel Edit Profile
+          button.btn-close(type="button" data-bs-dismiss="modal" aria-label="Close")
+        .modal-body
+          form(action="/user/update" method="POST" enctype="multipart/form-data")
+            .mb-3
+              label.form-label(for="editFullname") Full Name
+              input#editFullname.form-control(type="text" name="fullname" value=user ? user.fullname : '')
+            
+            .mb-3
+              label.form-label(for="editEmail") Email
+              input#editEmail.form-control(type="email" name="email" value=user ? user.email : '')
+            
+            .mb-3
+              label.form-label(for="editBio") Bio
+              textarea#editBio.form-control(name="bio" rows="3")= user ? user.bio : ''
+            
+            .mb-3
+              label.form-label(for="avatarUpload") Profile Picture
+              input#avatarUpload.form-control(type="file" name="avatar" accept="image/*")
+            
+            .d-grid.gap-2
+              button.btn.btn-primary(type="submit") Save Changes
+  
+  // Change Password Modal
+  .modal.fade#changePasswordModal(tabindex="-1" aria-labelledby="changePasswordModalLabel" aria-hidden="true")
+    .modal-dialog
+      .modal-content
+        .modal-header
+          h5.modal-title#changePasswordModalLabel Change Password
+          button.btn-close(type="button" data-bs-dismiss="modal" aria-label="Close")
+        .modal-body
+          form(action="/user/change-password" method="POST")
+            .mb-3
+              label.form-label(for="currentPassword") Current Password
+              input#currentPassword.form-control(type="password" name="currentPassword" required)
+            
+            .mb-3
+              label.form-label(for="newPassword") New Password
+              input#newPassword.form-control(type="password" name="newPassword" required)
+            
+            .mb-3
+              label.form-label(for="confirmNewPassword") Confirm New Password
+              input#confirmNewPassword.form-control(type="password" name="confirmNewPassword" required)
+            
+            .d-grid.gap-2
+              button.btn.btn-primary(type="submit") Change Password 

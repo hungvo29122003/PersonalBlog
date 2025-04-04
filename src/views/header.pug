@@ -1,0 +1,55 @@
+header.py-2.border-bottom
+  nav.navbar.navbar-expand-lg.navbar-light.bg-light
+    .container
+      a.navbar-brand(href="/") 
+        i.fas.fa-pen-fancy.me-2
+        | My Personal Blog
+      
+      button.navbar-toggler(type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation")
+        span.navbar-toggler-icon
+      
+      .collapse.navbar-collapse#navbarNav
+        ul.navbar-nav.me-auto
+          li.nav-item
+            a.nav-link(href="/home") Trang chủ
+          li.nav-item
+            a.nav-link(href="/posts") Bài viết
+          li.nav-item
+            a.nav-link(href="/about") Giới thiệu
+        
+        .d-flex
+          if user
+            .dropdown
+              button.btn.btn-outline-secondary.dropdown-toggle(type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false")
+                i.fas.fa-user.me-1
+                | #{user.username}
+              ul.dropdown-menu.dropdown-menu-end(aria-labelledby="userDropdown")
+                li
+                  a.dropdown-item(href="/user/profile") Tài khoản
+                if user.role === 'admin'
+                  li
+                    a.dropdown-item(href="/admin/dashboard") Quản trị
+                li
+                  hr.dropdown-divider
+                li
+                  a.dropdown-item(href="/auth/logout" onclick="handleLogout(event)") Đăng xuất
+          else
+            a.btn.btn-outline-primary.me-2(href="/auth/login") Đăng nhập
+            a.btn.btn-primary(href="/auth/register") Đăng ký
+
+script.
+  function handleLogout(event) {
+    // Lưu trữ admin_id nếu có
+    const admin_id = localStorage.getItem('admin_id');
+    
+    // Xóa toàn bộ dữ liệu trong localStorage
+    localStorage.clear();
+    
+    // Lưu lại admin_id nếu có
+    if (admin_id) {
+      localStorage.setItem('admin_id', admin_id);
+    }
+    
+    // Cho phép tiếp tục chuyển hướng đến trang logout
+    return true;
+  }

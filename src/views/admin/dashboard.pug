@@ -1,0 +1,293 @@
+extends ../layouts/layout
+
+block content
+  if user && user.role === 'admin'
+    h1.mb-4 Admin Dashboard
+    
+    .row.mb-4
+      .col-md-3.mb-4
+        .card.border-0.shadow.text-center.h-100
+          .card-body
+            i.fas.fa-users.fa-3x.text-primary.mb-3
+            h3.card-title Users
+            h4.text-muted #{stats ? stats.totalUsers : 0}
+          .card-footer.bg-transparent.border-0
+            a.btn.btn-outline-primary.w-100(href="/admin/users") Manage Users
+      
+      .col-md-3.mb-4
+        .card.border-0.shadow.text-center.h-100
+          .card-body
+            i.fas.fa-file-alt.fa-3x.text-success.mb-3
+            h3.card-title Posts
+            h4.text-muted #{stats ? stats.totalPosts : 0}
+          .card-footer.bg-transparent.border-0
+            a.btn.btn-outline-success.w-100(href="/posts") Manage Posts
+      
+      .col-md-3.mb-4
+        .card.border-0.shadow.text-center.h-100
+          .card-body
+            i.fas.fa-comments.fa-3x.text-info.mb-3
+            h3.card-title Comments
+            h4.text-muted #{stats ? stats.totalComments : 0}
+          .card-footer.bg-transparent.border-0
+            a.btn.btn-outline-info.w-100(href="/admin/comments") Manage Comments
+      
+      .col-md-3.mb-4
+        .card.border-0.shadow.text-center.h-100
+          .card-body
+            i.fas.fa-heart.fa-3x.text-danger.mb-3
+            h3.card-title Likes
+            h4.text-muted #{stats ? stats.totalLikes : 0}
+          .card-footer.bg-transparent.border-0
+            a.btn.btn-outline-danger.w-100(href="/admin/likes") Manage Likes
+    
+    .row
+      .col-md-6.mb-4
+        .card.border-0.shadow.h-100
+          .card-header.bg-primary.text-white
+            h5.mb-0 Recent Users
+          .card-body
+            if recentUsers && recentUsers.length
+              .table-responsive
+                table.table.table-hover
+                  thead
+                    tr
+                      th Username
+                      th Email
+                      th Role
+                      th Joined
+                      th Actions
+                  tbody
+                    each user in recentUsers
+                      tr
+                        td= user.username
+                        td= user.email
+                        td
+                          span.badge(class=user.role === 'admin' ? 'bg-danger' : 'bg-info')= user.role
+                        td= new Date(user.created_at).toLocaleDateString()
+                        td
+                          .btn-group.btn-group-sm
+                            a.btn.btn-outline-primary(href=`/admin/users/${user.account_id}`)
+                              i.fas.fa-edit
+                            button.btn.btn-outline-danger.delete-user-btn(data-user-id=user.account_id)
+                              i.fas.fa-trash
+            else
+              .alert.alert-info No recent users.
+      
+      .col-md-6.mb-4
+        .card.border-0.shadow.h-100
+          .card-header.bg-primary.text-white
+            h5.mb-0 Recent Posts
+          .card-body
+            if recentPosts && recentPosts.length
+              .table-responsive
+                table.table.table-hover
+                  thead
+                    tr
+                      th Title
+                      th Author
+                      th Date
+                      th Status
+                      th Actions
+                  tbody
+                    each post in recentPosts
+                      tr
+                        td= post.title
+                        td= post.author || 'Anonymous'
+                        td= new Date(post.create_at).toLocaleDateString()
+                        td
+                          span.badge(class=post.status === 'published' ? 'bg-success' : 'bg-warning')= post.status
+                        td
+                          .btn-group.btn-group-sm
+                            a.btn.btn-outline-primary(href=`/post/edit/${post.post_id}`)
+                              i.fas.fa-edit
+                            button.btn.btn-outline-danger.delete-post-btn(data-post-id=post.post_id)
+                              i.fas.fa-trash
+            else
+              .alert.alert-info No recent posts.
+    
+    .row
+      .col-12.mb-4
+        .card.border-0.shadow
+          .card-header.bg-primary.text-white
+            h5.mb-0 Moderation Queue
+          .card-body
+            if moderationItems && moderationItems.length
+              .table-responsive
+                table.table.table-hover
+                  thead
+                    tr
+                      th Type
+                      th Content
+                      th User
+                      th Date
+                      th Actions
+                  tbody
+                    each item in moderationItems
+                      tr
+                        td
+                          span.badge(class=item.type === 'comment' ? 'bg-info' : 'bg-success')= item.type
+                        td= item.content.substring(0, 50) + (item.content.length > 50 ? '...' : '')
+                        td= item.username
+                        td= new Date(item.created_at).toLocaleDateString()
+                        td
+                          .btn-group.btn-group-sm
+                            button.btn.btn-outline-success.approve-item-btn(data-item-id=item.id data-item-type=item.type)
+                              i.fas.fa-check
+                            button.btn.btn-outline-danger.reject-item-btn(data-item-id=item.id data-item-type=item.type)
+                              i.fas.fa-ban
+            else
+              .alert.alert-info No items in moderation queue.
+  else
+    .alert.alert-danger
+      h4.alert-heading Access Denied
+      p You do not have permission to access this page. Please log in with an admin account. 
+
+block scripts
+  script.
+    document.addEventListener('DOMContentLoaded', function() {
+      // Lấy các phần tử hiển thị số liệu
+      const commentsCountElement = document.querySelector('.card i.fa-comments').closest('.card-body').querySelector('h4.text-muted');
+      const likesCountElement = document.querySelector('.card i.fa-heart').closest('.card-body').querySelector('h4.text-muted');
+      const postsCountElement = document.querySelector('.card i.fa-file-alt').closest('.card-body').querySelector('h4.text-muted');
+      const usersCountElement = document.querySelector('.card i.fa-users').closest('.card-body').querySelector('h4.text-muted');
+      
+      console.log('Comments count element:', commentsCountElement);
+      console.log('Likes count element:', likesCountElement);
+      console.log('Posts count element:', postsCountElement);
+      console.log('Users count element:', usersCountElement);
+      
+      // Hàm cập nhật hiển thị
+      function updateStats() {
+        // Gọi API lấy tổng số người dùng (role=user)
+        fetch('/auth/users_count', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          console.log('Users data:', data);
+          // Kiểm tra cấu trúc data để lấy đúng giá trị
+          let userCount = 0;
+          if (data) {
+            if (typeof data === 'object' && data.totalUsers !== undefined) {
+              // Nếu API trả về {totalUsers: số}
+              userCount = data.totalUsers;
+            } else if (Array.isArray(data)) {
+              // Nếu API trả về mảng users
+              userCount = data.length;
+            }
+          }
+          
+          // Cập nhật hiển thị
+          if (usersCountElement) {
+            usersCountElement.textContent = userCount;
+            console.log('Updated users count:', userCount);
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching users count:', error);
+        });
+        
+        // Gọi API lấy tổng số bài post
+        fetch('/post/count', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          console.log('Posts data:', data);
+          // Kiểm tra cấu trúc data để lấy đúng giá trị
+          let postCount = 0;
+          if (data) {
+            if (typeof data === 'object' && data.totalPosts !== undefined) {
+              // Nếu API trả về {totalPosts: số}
+              postCount = data.totalPosts;
+            } else if (Array.isArray(data)) {
+              // Nếu API trả về mảng posts
+              postCount = data.length;
+            }
+          }
+          
+          // Cập nhật hiển thị
+          if (postsCountElement) {
+            postsCountElement.textContent = postCount;
+            console.log('Updated posts count:', postCount);
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching posts count:', error);
+        });
+        
+        // Gọi API lấy tổng số comments
+        fetch('/comment', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          console.log('Comments data:', data);
+          // Kiểm tra cấu trúc data để lấy đúng giá trị
+          let commentCount = 0;
+          if (data) {
+            if (typeof data === 'object' && data.totalComments !== undefined) {
+              // Nếu API trả về {totalComments: số}
+              commentCount = data.totalComments;
+            } else if (Array.isArray(data)) {
+              // Nếu API trả về mảng comments
+              commentCount = data.length;
+            }
+          }
+          
+          // Cập nhật hiển thị
+          if (commentsCountElement) {
+            commentsCountElement.textContent = commentCount;
+            console.log('Updated comments count:', commentCount);
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching comments count:', error);
+        });
+        
+        // Gọi API lấy tổng số likes
+        fetch('/like', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          console.log('Likes data:', data);
+          // Kiểm tra cấu trúc data để lấy đúng giá trị
+          let likeCount = 0;
+          if (data) {
+            if (typeof data === 'object' && data.totalLikes !== undefined) {
+              // Nếu API trả về {totalLikes: số}
+              likeCount = data.totalLikes;
+            } else if (Array.isArray(data)) {
+              // Nếu API trả về mảng likes
+              likeCount = data.length;
+            }
+          }
+          
+          // Cập nhật hiển thị
+          if (likesCountElement) {
+            likesCountElement.textContent = likeCount;
+            console.log('Updated likes count:', likeCount);
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching likes count:', error);
+        });
+      }
+      
+      // Gọi hàm cập nhật ngay khi trang tải xong
+      updateStats();
+    }); 

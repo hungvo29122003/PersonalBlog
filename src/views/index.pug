@@ -1,0 +1,27 @@
+//- doctype html
+//- html
+//-   head
+//-     title Trang Chủ
+//-     link(rel="stylesheet" href="/styles.css")
+//-   body
+//-     include header.pug
+//-     main
+//-       h2 Chào mừng đến với Blog
+//-     include footer.pug
+doctype html
+html
+  head
+    title Trang Chủ
+    link(rel="stylesheet" href="/styles.css")
+  body
+    include header.pug
+    main
+      if !user
+        h2 Đăng Nhập
+        form(action="/auth/login" method="POST")
+            input(type="text" name="username" placeholder="Tên đăng nhập" required)
+            input(type="password" name="pass" placeholder="Mật khẩu" required)
+            button(type="submit") Đăng Nhập
+      else
+        h2 Chào mừng, #{user.username}
+    include footer.pug

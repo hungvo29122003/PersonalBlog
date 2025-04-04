@@ -1,0 +1,244 @@
+extends layouts/layout
+
+block content
+  if post
+    .row
+      .col-lg-8
+        // Post content
+        article(data-post-loaded=post ? "true" : "false")
+          // Post header
+          header.mb-4
+            h1.fw-bolder.mb-1= post.title
+            p.text-muted.fst-italic.mb-2 Posted on #{new Date(post.create_at).toLocaleDateString()} by 
+              if post.author
+                | #{post.author}
+              else
+                | Anonymous
+            
+            if user && (user.role === 'admin' || user.account_id === post.account_id)
+              .mb-3
+                a.btn.btn-sm.btn-outline-primary.me-2(href=`/post/edit/${post.post_id}`)
+                  i.fas.fa-edit.me-1
+                  | Edit Post
+                button.btn.btn-sm.btn-outline-danger.delete-post-btn(data-post-id=post.post_id)
+                  i.fas.fa-trash.me-1
+                  | Delete
+          
+          // Post content
+          section.mb-5
+            if post.image_url
+              figure.mb-4
+                img.img-fluid.rounded(src=post.image_url alt=post.title)
+            
+            .fs-5.mb-4= post.content
+          
+          // Like section
+          .mb-4
+            button.btn.btn-outline-danger.like-btn(data-post-id=post.post_id class=liked ? 'active' : '')
+              i.far.fa-heart.me-1
+              | Like
+              if post.likes_count
+                span.ms-2.badge.bg-secondary= post.likes_count
+        
+        // Comments section
+        section.mb-5
+          .card.bg-light
+            .card-body
+              h4.mb-4 Comments
+              if user
+                form.mb-4.comment-form(data-post-id=post.post_id)
+                  textarea.form-control(rows="3" placeholder="Join the discussion..." required)
+                  button.btn.btn-primary.mt-2(type="submit") Post Comment
+              else
+                .alert.alert-info.mb-3 Please 
+                  a(href="/auth/login") login 
+                  | to leave a comment.
+              
+              if comments && comments.length
+            each comment in comments
+                  .d-flex.mb-4
+                    .flex-shrink-0
+                      img.rounded-circle(src=comment.user_avatar || '/img/default-avatar.png' alt="User Avatar" width="50" height="50")
+                    .ms-3
+                      .fw-bold= comment.username || 'Anonymous'
+                p= comment.content
+                      small.text-muted #{new Date(comment.created_at).toLocaleString()}
+                      if user && (user.account_id === comment.account_id || user.role === 'admin')
+                        .mt-1
+                          button.btn.btn-sm.btn-link.text-danger.delete-comment-btn(data-comment-id=comment.comment_id) Delete
+              else
+                .alert.alert-info.mb-0 No comments yet. Be the first to comment!
+      
+      .col-lg-4
+        // Author info
+        .card.mb-4
+          .card-header Author
+          .card-body
+            .d-flex.align-items-center
+              if post.author_avatar
+                img.rounded-circle.me-3(src=post.author_avatar alt="Author Avatar" width="70" height="70")
+              else
+                .bg-secondary.rounded-circle.me-3.d-flex.align-items-center.justify-content-center(style="width: 70px; height: 70px;")
+                  i.fas.fa-user.text-white.fa-2x
+              .small
+                .fw-bold= post.author || 'Anonymous'
+                if post.author_bio
+                  div= post.author_bio
+        
+        // Related posts card
+        .card.mb-4
+          .card-header Related Posts
+          .card-body
+            if relatedPosts && relatedPosts.length
+              each relatedPost in relatedPosts
+                .row.mb-2
+                  .col-12
+                    a.text-decoration-none(href=`/post/details/${relatedPost.post_id}`)= relatedPost.title
+            else
+              p.mb-0 No related posts available.
+              
+        // Categories widget
+        .card.mb-4
+          .card-header Categories
+          .card-body
+            .row
+              .col-sm-6
+                ul.list-unstyled.mb-0
+                  li
+                    a.text-decoration-none(href="/posts?category=tech") Technology
+                  li
+                    a.text-decoration-none(href="/posts?category=travel") Travel
+              .col-sm-6
+                ul.list-unstyled.mb-0
+                  li
+                    a.text-decoration-none(href="/posts?category=food") Food
+                  li
+                    a.text-decoration-none(href="/posts?category=lifestyle") Lifestyle
+  else
+    .alert.alert-danger Post not found
+
+block scripts
+  script.
+    document.addEventListener('DOMContentLoaded', function() {
+      // Lấy post_id từ localStorage
+      const post_id = localStorage.getItem('current_post_id');
+      console.log('Đã lấy post_id từ localStorage:', post_id);
+      
+      // Kiểm tra xem đã có dữ liệu bài viết từ server-side rendering chưa
+      const hasServerData = document.querySelector('[data-post-loaded="true"]');
+      
+      // Chỉ tải dữ liệu bài viết từ API nếu chưa có dữ liệu và có post_id trong localStorage
+      if (!hasServerData && post_id) {
+        console.log('Không có dữ liệu server-side, sẽ tải từ API');
+        fetchPostDetails(post_id);
+      } else {
+        console.log('Đã có dữ liệu bài viết từ server-side rendering');
+      }
+      
+      // Hàm lấy chi tiết bài viết
+      async function fetchPostDetails(postId) {
+        try {
+          console.log('Đang lấy thông tin bài viết với ID:', postId);
+          
+          // Sử dụng endpoint hiện có trong ứng dụng
+          const response = await fetch(`/post/details/${postId}`);
+          if (!response.ok) {
+            throw new Error(`Lỗi khi lấy dữ liệu: ${response.status}`);
+          }
+          
+          const postData = await response.json();
+          console.log('Dữ liệu bài viết:', postData);
+          
+          // Cập nhật thông tin bài viết trên trang
+          updatePostDetails(postData);
+        } catch (error) {
+          console.error('Lỗi khi lấy thông tin bài viết:', error);
+        }
+      }
+      
+      // Hàm cập nhật giao diện với thông tin bài viết
+      function updatePostDetails(post) {
+        if (!post) {
+          console.error('Không có dữ liệu bài viết');
+          return;
+        }
+        
+        // Kiểm tra xem post có phải là mảng không, nếu có lấy phần tử đầu tiên
+        if (Array.isArray(post) && post.length > 0) {
+          post = post[0];
+          console.log('Đã chuyển đổi dữ liệu thành object:', post);
+        }
+        
+        // Cập nhật tiêu đề
+        const titleElement = document.querySelector('h1.fw-bolder.mb-1');
+        if (titleElement && post.title) {
+          titleElement.textContent = post.title;
+          // Cập nhật tiêu đề trang
+          document.title = post.title;
+        }
+        
+        // Cập nhật nội dung
+        const contentElement = document.querySelector('.fs-5.mb-4');
+        if (contentElement && post.content) {
+          contentElement.textContent = post.content;
+        }
+        
+        // Cập nhật hình ảnh
+        if (post.image) {
+          // Tìm hoặc tạo phần tử figure nếu chưa có
+          let figureElement = document.querySelector('figure.mb-4');
+          if (!figureElement) {
+            const sectionElement = document.querySelector('section.mb-5');
+            if (sectionElement) {
+              figureElement = document.createElement('figure');
+              figureElement.className = 'mb-4';
+              sectionElement.insertBefore(figureElement, sectionElement.firstChild);
+            }
+          }
+          
+          if (figureElement) {
+            let imageElement = figureElement.querySelector('img');
+            if (!imageElement) {
+              imageElement = document.createElement('img');
+              imageElement.className = 'img-fluid rounded';
+              figureElement.appendChild(imageElement);
+            }
+            
+            imageElement.src = post.image;
+            imageElement.alt = post.title || 'Post image';
+          }
+        }
+        
+        // Cập nhật ngày tạo
+        const dateElement = document.querySelector('p.text-muted.fst-italic.mb-2');
+        if (dateElement && post.create_at) {
+          const date = new Date(post.create_at);
+          const formattedDate = date.toLocaleDateString();
+          // Giữ nguyên phần còn lại của đoạn văn bản
+          const existingText = dateElement.innerHTML;
+          const newText = existingText.replace(/Posted on [^<]+/, `Posted on ${formattedDate}`);
+          dateElement.innerHTML = newText;
+        }
+        
+        // Cập nhật URL cho nút Edit Post nếu cần
+        const editButton = document.querySelector('a.btn.btn-sm.btn-outline-primary.me-2');
+        if (editButton && post.post_id) {
+          editButton.href = `/post/edit/${post.post_id}`;
+        }
+        
+        // Cập nhật data-post-id cho nút Delete
+        const deleteButton = document.querySelector('button.btn.btn-sm.btn-outline-danger.delete-post-btn');
+        if (deleteButton && post.post_id) {
+          deleteButton.setAttribute('data-post-id', post.post_id);
+        }
+        
+        // Đánh dấu rằng đã tải dữ liệu bài viết
+        const articleElement = document.querySelector('article');
+        if (articleElement) {
+          articleElement.setAttribute('data-post-loaded', 'true');
+        } else {
+          console.warn('Không tìm thấy phần tử article để đánh dấu là đã tải');
+        }
+      }
+    });
+  script(src="/js/post-details.js")

@@ -1,0 +1,215 @@
+extends ../layouts/layout
+
+block content
+  if user
+    .row.justify-content-center
+      .col-lg-10
+        .card.border-0.shadow
+          .card-header.bg-primary.text-white
+            h3.mb-0= post ? 'Edit Post' : 'Create New Post'
+          .card-body.p-4
+            #messageContainer
+            
+            form#postForm(action=post ? `/post/${post.post_id}` : '/post' method="POST" enctype="multipart/form-data")
+              if post
+                input(type="hidden" name="_method" value="PUT")
+              
+              // Hidden field for admin_id
+              input#adminIdInput(type="hidden" name="admin_id")
+              
+              .mb-3
+                label.form-label(for="postTitle") Title
+                input#postTitle.form-control(type="text" name="title" value=post ? post.title : '' required)
+              
+              .mb-3
+                label.form-label(for="postContent") Content
+                textarea#postContent.form-control(name="content" rows="10" required)= post ? post.content : ''
+              
+              // Thêm khung chọn hình ảnh
+              .mb-3
+                label.form-label(for="postImage") Featured Image
+                input#postImage.form-control(type="file" name="image" accept="image/*")
+                small.form-text.text-muted Chọn hình ảnh cho bài viết (không bắt buộc)
+                if post && post.image
+                  .mt-2
+                    p.mb-1 Hình ảnh hiện tại:
+                    img.img-thumbnail(src=post.image alt="Current image" style="max-height: 200px")
+                    .form-check.mt-2
+                      input#removeImage.form-check-input(type="checkbox" name="remove_image")
+                      label.form-check-label(for="removeImage") Xóa hình ảnh hiện tại
+              
+              // Thêm các trường khác nhưng không gửi lên server
+              .row.mb-3
+                .col-md-6
+                  label.form-label(for="postCategory") Category (Chưa hỗ trợ)
+                  select#postCategory.form-select(disabled)
+                    option(value="" selected) Select Category
+                    option(value="tech") Technology
+                    option(value="travel") Travel
+                    option(value="food") Food
+                    option(value="lifestyle") Lifestyle
+                
+                .col-md-6
+                  label.form-label(for="postStatus") Status (Chưa hỗ trợ)
+                  select#postStatus.form-select(disabled)
+                    option(value="draft" selected) Draft
+                    option(value="published") Published
+              
+              .d-flex.justify-content-between.mt-4
+                if post
+                  .btn-group
+                    button.btn.btn-primary(type="submit") Save Changes
+                    a.btn.btn-outline-secondary(href=`/post/details/${post.post_id}`) Cancel
+                else
+                  .btn-group
+                    button.btn.btn-primary(type="submit") Create Post
+                    button.btn.btn-outline-secondary(type="button" onclick="window.history.back()") Cancel
+                
+                if post
+                  button.btn.btn-outline-danger.delete-post-btn(type="button" data-post-id=post.post_id) Delete Post
+
+  else
+    .alert.alert-danger You must be logged in to create or edit posts
+    a.btn.btn-primary.mt-2(href="/auth/login") Login
+
+block scripts
+  script.
+    document.addEventListener('DOMContentLoaded', function() {
+      // Đảm bảo có admin_id
+      const adminId = localStorage.getItem('admin_id');
+      console.log('Retrieved admin_id from localStorage:', adminId);
+      
+      if (adminId) {
+        const adminIdInput = document.getElementById('adminIdInput');
+        if (adminIdInput) {
+          adminIdInput.value = adminId;
+          console.log('Set admin_id in form:', adminIdInput.value);
+        }
+      } else {
+        console.warn('admin_id not found in localStorage');
+        showMessage('error', 'Không tìm thấy admin_id. Vui lòng đăng nhập lại với quyền admin!');
+      }
+      
+      // Hiển thị tên file được chọn
+      const imageInput = document.getElementById('postImage');
+      if (imageInput) {
+        imageInput.addEventListener('change', function() {
+          if (this.files.length > 0) {
+            const fileName = this.files[0].name;
+            const fileSize = Math.round(this.files[0].size / 1024); // kB
+            
+            // Hiển thị thông tin file
+            const fileInfo = document.createElement('div');
+            fileInfo.className = 'mt-2 text-muted small';
+            fileInfo.innerHTML = `File đã chọn: <strong>${fileName}</strong> (${fileSize}kB)`;
+            
+            // Xóa thông tin file cũ nếu có
+            const oldFileInfo = this.parentElement.querySelector('.text-muted.small:not(.form-text)');
+            if (oldFileInfo) {
+              oldFileInfo.remove();
+            }
+            
+            // Thêm thông tin file mới
+            this.parentElement.appendChild(fileInfo);
+            
+            // Hiển thị preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+              // Xóa preview cũ nếu có
+              const oldPreview = imageInput.parentElement.querySelector('.preview-container');
+              if (oldPreview) {
+                oldPreview.remove();
+              }
+              
+              // Tạo preview mới
+              const previewContainer = document.createElement('div');
+              previewContainer.className = 'preview-container mt-2';
+              
+              const previewImage = document.createElement('img');
+              previewImage.src = e.target.result;
+              previewImage.className = 'img-thumbnail';
+              previewImage.style.maxHeight = '200px';
+              
+              previewContainer.appendChild(previewImage);
+              imageInput.parentElement.appendChild(previewContainer);
+            };
+            reader.readAsDataURL(this.files[0]);
+          }
+        });
+      }
+      
+      // Form submit với AJAX
+      const postForm = document.getElementById('postForm');
+      if (postForm) {
+        postForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          
+          // Kiểm tra đầy đủ các trường bắt buộc
+          const title = document.getElementById('postTitle').value.trim();
+          const content = document.getElementById('postContent').value.trim();
+          const adminIdInput = document.getElementById('adminIdInput');
+          
+          let hasError = false;
+          let errorMessage = '';
+          
+          if (!title) {
+            errorMessage = 'Vui lòng nhập tiêu đề bài viết';
+            hasError = true;
+          } else if (!content) {
+            errorMessage = 'Vui lòng nhập nội dung bài viết';
+            hasError = true;
+          } else if (!adminIdInput || !adminIdInput.value) {
+            errorMessage = 'Không thể tạo bài viết: admin_id không tồn tại. Vui lòng đăng nhập lại với quyền admin.';
+            hasError = true;
+          }
+          
+          if (hasError) {
+            showMessage('error', errorMessage);
+            console.error('Form validation error:', errorMessage);
+            return;
+          }
+          
+          // Hiển thị loading
+          const submitBtn = postForm.querySelector('button[type="submit"]');
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Đang xử lý...';
+          }
+          
+          // Gửi form trực tiếp (không sử dụng AJAX để hỗ trợ upload file)
+          postForm.submit();
+        });
+      }
+      
+      // Hàm hiển thị thông báo
+      function showMessage(type, message) {
+        // Xóa thông báo cũ nếu có
+        const messageContainer = document.getElementById('messageContainer');
+        messageContainer.innerHTML = '';
+        
+        // Tạo thông báo mới
+        const alertDiv = document.createElement('div');
+        alertDiv.className = type === 'success' ? 'alert alert-success' : 'alert alert-danger';
+        
+        const icon = document.createElement('i');
+        icon.className = type === 'success' ? 'fas fa-check-circle me-2' : 'fas fa-exclamation-circle me-2';
+        
+        alertDiv.appendChild(icon);
+        alertDiv.appendChild(document.createTextNode(message));
+        
+        // Thêm nút đóng thông báo
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'btn-close';
+        closeBtn.setAttribute('data-bs-dismiss', 'alert');
+        closeBtn.setAttribute('aria-label', 'Close');
+        closeBtn.style.float = 'right';
+        alertDiv.appendChild(closeBtn);
+        
+        // Chèn thông báo vào container
+        messageContainer.appendChild(alertDiv);
+        
+        // Tự động cuộn lên đầu để thấy thông báo
+        window.scrollTo(0, 0);
+      }
+    });

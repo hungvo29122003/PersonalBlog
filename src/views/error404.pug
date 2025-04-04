@@ -1,0 +1,22 @@
+extends layouts/layout
+
+block content
+  .row.justify-content-center.mt-5
+    .col-md-8.text-center
+      .mb-4
+        i.fas.fa-search.text-secondary.fa-5x
+      
+      h1.display-4 Page Not Found
+      p.lead The page you're looking for doesn't exist or has been moved.
+      
+      .mt-4
+        p Perhaps you mistyped the URL or the page has been relocated.
+        p You can use the navigation menu or return to the home page.
+      
+      .mt-5
+        a.btn.btn-primary.me-2(href="/") 
+          i.fas.fa-home.me-1
+          | Back to Home
+        button.btn.btn-outline-secondary(onclick="window.history.back()")
+          i.fas.fa-arrow-left.me-1
+          | Go Back

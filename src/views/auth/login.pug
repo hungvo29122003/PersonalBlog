@@ -1,0 +1,377 @@
+extends ../layouts/layout
+
+block content
+  .row.justify-content-center
+    .col-md-6.col-lg-5
+      .card.shadow.border-0.mt-4
+        .card-header.bg-primary.text-white.text-center.py-3
+          h3.mb-0 Login
+        .card-body.p-4
+          if error
+            .alert.alert-danger
+              i.fas.fa-exclamation-circle.me-2
+              | #{error}
+          
+          if success
+            .alert.alert-success
+              i.fas.fa-check-circle.me-2
+              | #{success}
+          
+          form#login-form(action="/auth/login" method="POST")
+            .mb-3
+              label.form-label(for="username") Username
+              .input-group
+                span.input-group-text
+                  i.fas.fa-user
+                input#username.form-control(type="text" name="username" placeholder="Enter your username" required)
+            
+            .mb-3
+              label.form-label(for="password") Password
+              .input-group
+                span.input-group-text
+                  i.fas.fa-lock
+                input#password.form-control(type="password" name="pass" placeholder="Enter your password" required)
+            
+            .mb-3.form-check
+              input#rememberMe.form-check-input(type="checkbox" name="remember")
+              label.form-check-label(for="rememberMe") Remember me
+            
+            .d-grid.gap-2
+              button.btn.btn-primary.py-2(type="submit") Login
+        
+        .card-footer.bg-light.py-3.text-center
+          p.mb-0 Don't have an account? 
+            a.text-decoration-none(href="/auth/register") Register here 
+
+block scripts
+  script.
+    document.addEventListener('DOMContentLoaded', function() {
+      const loginForm = document.getElementById('login-form');
+      
+      if (loginForm) {
+        loginForm.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          
+          const username = document.getElementById('username').value;
+          const password = document.getElementById('password').value;
+          const remember = document.getElementById('rememberMe').checked;
+          
+          try {
+            // Gửi yêu cầu đăng nhập
+            const response = await fetch('/auth/login', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify({
+                username,
+                pass: password,
+                remember
+              })
+            });
+            
+            // Xử lý response
+            if (response.ok) {
+              try {
+                const data = await response.json();
+                
+                // QUAN TRỌNG: Đặt cờ hiệu để ngăn chuyển trang quá nhanh
+                let accountIdSaved = false;
+                let redirectAllowed = false;
+                
+                // Lấy account_id từ accessToken nếu có
+                if (data.accessToken) {
+                  try {
+                    console.log('AccessToken nhận được:', data.accessToken);
+                    
+                    // Kiểm tra xem trình duyệt có hỗ trợ localStorage không
+                    if (typeof localStorage === 'undefined') {
+                      console.error('Trình duyệt không hỗ trợ localStorage!');
+                    } else {
+                      // Kiểm tra localStorage có sẵn sàng không
+                      try {
+                        localStorage.setItem('test', 'test');
+                        localStorage.removeItem('test');
+                        console.log('localStorage hoạt động bình thường');
+                      } catch (storageError) {
+                        console.error('Không thể sử dụng localStorage:', storageError);
+                      }
+                    }
+                    
+                    const tokenParts = data.accessToken.split('.');
+                    if (tokenParts.length === 3) {
+                      try {
+                        // Hiển thị các phần của token
+                        console.log('Header (base64):', tokenParts[0]);
+                        console.log('Payload (base64):', tokenParts[1]);
+                        
+                        // Giải mã phần payload của JWT
+                        const base64Url = tokenParts[1];
+                        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                        console.log('Base64 được chuẩn hóa:', base64);
+                        
+                        // Giải mã base64 thành chuỗi JSON
+                        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                        }).join(''));
+                        console.log('JSON payload:', jsonPayload);
+                        
+                        // Parse JSON thành object
+                        const payload = JSON.parse(jsonPayload);
+                        console.log('Dữ liệu trong payload JWT:', payload);
+                        
+                        // Lưu account_id vào localStorage
+                        if (payload.account_id) {
+                          // Lưu với nhiều cách khác nhau để đảm bảo
+                          localStorage.setItem('account_id', payload.account_id);
+                          localStorage.setItem('account_id_string', String(payload.account_id));
+                          localStorage.setItem('account_id_number', Number(payload.account_id));
+                          
+                          // Kiểm tra xem lưu có thành công không
+                          const savedValue = localStorage.getItem('account_id');
+                          console.log('Đã lưu account_id vào localStorage:', payload.account_id);
+                          console.log('Giá trị đọc lại từ localStorage:', savedValue);
+                          
+                          if (savedValue === null) {
+                            console.error('Lưu account_id không thành công!');
+                          } else if (savedValue !== String(payload.account_id)) {
+                            console.error('Giá trị đọc lại không khớp:', savedValue, '!=', payload.account_id);
+                          } else {
+                            console.log('Lưu account_id thành công!');
+                          }
+                          
+                          // Thêm log để debug
+                          console.log('Tất cả các khoá trong localStorage:');
+                          for (let i = 0; i < localStorage.length; i++) {
+                            const key = localStorage.key(i);
+                            console.log(`- ${key}: ${localStorage.getItem(key)}`);
+                          }
+                        } else {
+                          console.error('Không tìm thấy account_id trong payload token:', payload);
+                        }
+                        
+                        // Log thêm thông tin khác từ payload
+                        console.log('Username từ token:', payload.username);
+                        console.log('Role từ token:', payload.role);
+                        console.log('Thời gian tạo token (iat):', new Date(payload.iat * 1000).toLocaleString());
+                        console.log('Thời gian hết hạn token (exp):', new Date(payload.exp * 1000).toLocaleString());
+                      } catch (decodeError) {
+                        console.error('Lỗi khi giải mã JWT:', decodeError);
+                        console.error('Chi tiết lỗi:', decodeError.stack);
+                      }
+                    } else {
+                      console.error('Token không hợp lệ, không có đủ 3 phần. Số phần:', tokenParts.length);
+                      console.error('Các phần của token:', tokenParts);
+                    }
+                  } catch (tokenError) {
+                    console.error('Lỗi khi xử lý token:', tokenError);
+                    console.error('Chi tiết lỗi:', tokenError.stack);
+                  }
+                } else {
+                  console.error('Không nhận được accessToken từ server');
+                }
+                
+                // Tạo thông báo đăng nhập thành công
+                const alertContainer = document.createElement('div');
+                alertContainer.className = 'alert alert-success mt-3';
+                alertContainer.innerHTML = `
+                  <i class="fas fa-check-circle me-2"></i>
+                  <span>Đăng nhập thành công! Đang xử lý dữ liệu...</span>
+                `;
+                
+                // Thêm thông báo vào trang
+                const cardBody = document.querySelector('.card-body');
+                if (cardBody) {
+                  // Xóa form đăng nhập
+                  loginForm.style.display = 'none';
+                  
+                  // Thêm thông báo
+                  cardBody.appendChild(alertContainer);
+                  
+                  // Tạo thanh tiến trình
+                  const progressContainer = document.createElement('div');
+                  progressContainer.className = 'progress mt-3';
+                  progressContainer.innerHTML = `
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                         role="progressbar" 
+                         style="width: 0%" 
+                         aria-valuenow="0" 
+                         aria-valuemin="0" 
+                         aria-valuemax="100">
+                    </div>
+                  `;
+                  cardBody.appendChild(progressContainer);
+                  
+                  // Thời gian tối đa chờ đợi - 10 phút (600 giây)
+                  const maxWaitTime = 600; // giây
+                  let elapsedTime = 0;
+                  const progressBar = progressContainer.querySelector('.progress-bar');
+                  
+                  // Tạo div hiển thị trạng thái
+                  const statusDiv = document.createElement('div');
+                  statusDiv.className = 'text-center mt-3';
+                  statusDiv.innerHTML = `<p>Đang chờ xử lý dữ liệu: <span id="status-text">Chờ lưu account_id...</span></p>`;
+                  cardBody.appendChild(statusDiv);
+                  
+                  // Tạo nút chuyển trang ngay
+                  const skipButton = document.createElement('button');
+                  skipButton.className = 'btn btn-outline-secondary mt-3';
+                  skipButton.textContent = 'Chuyển trang ngay (không chờ lưu account_id)';
+                  skipButton.style.display = 'none'; // Ẩn nút ban đầu, chỉ hiện sau 60 giây
+                  skipButton.addEventListener('click', function() {
+                    if (confirm('account_id có thể chưa được lưu. Bạn có chắc muốn chuyển trang ngay?')) {
+                      // Chuyển hướng ngay lập tức
+                      if (data.redirectUrl) {
+                        window.location.href = data.redirectUrl;
+                      } else {
+                        window.location.href = '/';
+                      }
+                    }
+                  });
+                  cardBody.appendChild(skipButton);
+                  
+                  // Biến để kiểm tra xem đã lưu account_id thành công chưa
+                  let accountIdSaved = false;
+                  
+                  // Hàm kiểm tra xem account_id đã được lưu chưa
+                  function checkAccountIdSaved() {
+                    const savedAccountId = localStorage.getItem('account_id');
+                    console.log('Kiểm tra account_id trong localStorage:', savedAccountId);
+                    
+                    if (savedAccountId) {
+                      accountIdSaved = true;
+                      document.getElementById('status-text').textContent = 'account_id đã được lưu!';
+                      document.getElementById('status-text').style.color = 'green';
+                      document.getElementById('status-text').style.fontWeight = 'bold';
+                      
+                      // Hiển thị thông báo thành công
+                      alertContainer.innerHTML = `
+                        <i class="fas fa-check-circle me-2"></i>
+                        <span>Đăng nhập thành công! account_id đã được lưu. Chuyển hướng trong 30 giây...</span>
+                      `;
+                      
+                      // Đổi màu nút skip
+                      skipButton.className = 'btn btn-success mt-3';
+                      skipButton.textContent = 'Chuyển trang ngay';
+                      skipButton.style.display = 'block'; // Hiện nút
+                      
+                      // Thêm đếm ngược
+                      let countdownSeconds = 30;
+                      const countdownInterval = setInterval(() => {
+                        countdownSeconds--;
+                        
+                        if (countdownSeconds <= 0) {
+                          clearInterval(countdownInterval);
+                          
+                          // Chuyển hướng sau khi đếm ngược kết thúc
+                          if (data.redirectUrl) {
+                            window.location.href = data.redirectUrl;
+                          } else {
+                            window.location.href = '/';
+                          }
+                        } else {
+                          // Cập nhật text đếm ngược
+                          alertContainer.innerHTML = `
+                            <i class="fas fa-check-circle me-2"></i>
+                            <span>Đăng nhập thành công! account_id đã được lưu. Chuyển hướng trong ${countdownSeconds} giây...</span>
+                          `;
+                        }
+                      }, 1000);
+                      
+                      return true;
+                    }
+                    return false;
+                  }
+                  
+                  // Kiểm tra account_id mỗi giây
+                  const checkInterval = setInterval(() => {
+                    // Tăng thời gian đã trôi qua
+                    elapsedTime += 1;
+                    
+                    // Cập nhật thanh tiến trình
+                    const progressPercent = (elapsedTime / maxWaitTime) * 100;
+                    if (progressBar) {
+                      progressBar.style.width = `${Math.min(progressPercent, 100)}%`;
+                      progressBar.setAttribute('aria-valuenow', Math.min(progressPercent, 100));
+                    }
+                    
+                    // Hiện nút skip sau 60 giây
+                    if (elapsedTime >= 60 && !accountIdSaved) {
+                      skipButton.style.display = 'block';
+                    }
+                    
+                    // Kiểm tra xem account_id đã được lưu chưa
+                    if (checkAccountIdSaved()) {
+                      clearInterval(checkInterval); // Dừng kiểm tra nếu đã lưu
+                      return;
+                    }
+                    
+                    // Cập nhật trạng thái
+                    const statusText = document.getElementById('status-text');
+                    if (statusText) {
+                      statusText.textContent = `Chờ lưu account_id... (${elapsedTime}s/${maxWaitTime}s)`;
+                    }
+                    
+                    // Nếu đã đợi hết thời gian tối đa
+                    if (elapsedTime >= maxWaitTime) {
+                      clearInterval(checkInterval);
+                      
+                      // Hiển thị thông báo hết thời gian
+                      alertContainer.className = 'alert alert-warning mt-3';
+                      alertContainer.innerHTML = `
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <span>Hết thời gian chờ! Không thể lưu account_id sau nhiều lần thử. Bạn có thể gặp sự cố khi sử dụng các tính năng của trang web.</span>
+                      `;
+                      
+                      // Cập nhật trạng thái
+                      document.getElementById('status-text').textContent = 'Hết thời gian chờ!';
+                      document.getElementById('status-text').style.color = 'red';
+                      
+                      // Thay đổi nút skip thành nút tiếp tục
+                      skipButton.className = 'btn btn-primary mt-3';
+                      skipButton.textContent = 'Tiếp tục (không có account_id)';
+                      skipButton.style.display = 'block';
+                      
+                      // Sau 30 giây không có phản hồi, tự động chuyển trang
+                      setTimeout(() => {
+                        if (data.redirectUrl) {
+                          window.location.href = data.redirectUrl;
+                        } else {
+                          window.location.href = '/';
+                        }
+                      }, 30000); // 30 giây
+                    }
+                  }, 1000);
+                  
+                } else {
+                  // Nếu không tìm thấy card-body, chuyển hướng ngay lập tức
+                  if (data.redirectUrl) {
+                    window.location.href = data.redirectUrl;
+                  } else {
+                    window.location.href = '/';
+                  }
+                }
+                
+              } catch (jsonError) {
+                // Submit form theo cách thông thường nếu không xử lý được JSON
+                loginForm.removeEventListener('submit', arguments.callee);
+                loginForm.submit();
+              }
+            } else {
+              // Xử lý lỗi đăng nhập
+              alert('Đăng nhập thất bại. Vui lòng thử lại.');
+              
+              // Submit form theo cách thông thường
+              loginForm.removeEventListener('submit', arguments.callee);
+              loginForm.submit();
+            }
+            
+          } catch (error) {
+            // Submit form theo cách thông thường nếu có lỗi
+            loginForm.removeEventListener('submit', arguments.callee);
+            loginForm.submit();
+          }
+        });
+      }
+    }); 

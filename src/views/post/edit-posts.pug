@@ -1,0 +1,568 @@
+extends ../layouts/layout
+
+block content
+  if user
+    .row.justify-content-center
+      .col-lg-10
+        .card.border-0.shadow
+          .card-header.bg-primary.text-white
+            h3.mb-0 Edit Post
+          .card-body.p-4
+            #messageContainer
+            
+            form#postForm(action="" method="POST" enctype="multipart/form-data")
+              input(type="hidden" name="_method" value="PUT")
+              
+              // Hidden field for admin_id
+              input#adminIdInput(type="hidden" name="admin_id")
+              
+              // Hidden field for post_id
+              input#postIdInput(type="hidden" name="post_id")
+              
+              // Hidden field for redirect URL
+              input(type="hidden" name="redirect_url" value="/posts")
+              
+              .mb-3
+                label.form-label(for="postTitle") Title
+                input#postTitle.form-control(type="text" name="title" required)
+              
+              .mb-3
+                label.form-label(for="postContent") Content
+                textarea#postContent.form-control(name="content" rows="10" required)
+              
+              // Thêm khung chọn hình ảnh
+              .mb-3
+                label.form-label(for="postImage") Featured Image
+                input#postImage.form-control(type="file" name="image" accept="image/*")
+                small.form-text.text-muted Chọn hình ảnh cho bài viết (không bắt buộc)
+                #currentImageContainer.mt-2
+                  // Hiển thị hình ảnh hiện tại (sẽ được thêm bằng JavaScript)
+                
+                .form-check.mt-2
+                  input#removeImage.form-check-input(type="checkbox" name="remove_image")
+                  label.form-check-label(for="removeImage") Xóa hình ảnh hiện tại
+              
+              .d-flex.justify-content-between.mt-4
+                .btn-group
+                  button.btn.btn-primary(type="submit") Save Changes
+                  button#cancelButton.btn.btn-outline-secondary(type="button") Cancel
+                
+                button#deleteButton.btn.btn-outline-danger(type="button") Delete Post
+
+  else
+    .alert.alert-danger You must be logged in to edit posts
+    a.btn.btn-primary.mt-2(href="/auth/login") Login
+
+block scripts
+  script.
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('DOM loaded in edit-posts.pug');
+      
+      // Lấy post_id từ localStorage
+      const post_id = localStorage.getItem('current_post_id');
+      console.log('Đã lấy post_id từ localStorage:', post_id);
+      
+      if (!post_id) {
+        console.error('Không tìm thấy post_id trong localStorage!');
+        showMessage('error', 'Không tìm thấy thông tin bài viết cần chỉnh sửa');
+        return;
+      }
+      
+      // Lấy thông tin bài viết từ localStorage
+      try {
+        const postDataString = localStorage.getItem('edit_post_data');
+        console.log('Dữ liệu bài viết từ localStorage:', postDataString);
+        
+        let postData = null;
+        if (postDataString) {
+          postData = JSON.parse(postDataString);
+          console.log('Đã parse dữ liệu bài viết:', postData);
+          
+          // Điền thông tin bài viết vào form
+          fillPostForm(postData);
+        } else {
+          // Nếu không có dữ liệu trong localStorage, gọi API để lấy thông tin bài viết
+          console.log('Không tìm thấy dữ liệu bài viết trong localStorage, gọi API...');
+          fetchPostDetails(post_id);
+        }
+      } catch (error) {
+        console.error('Lỗi khi lấy dữ liệu bài viết từ localStorage:', error);
+        
+        // Nếu có lỗi, gọi API để lấy thông tin bài viết
+        fetchPostDetails(post_id);
+      }
+      
+      // Đảm bảo có admin_id
+      const account_id = localStorage.getItem('account_id');
+      console.log('Retrieved account_id from localStorage:', account_id);
+      const admin_id = localStorage.getItem('admin_id');
+      console.log('Retrieved admin_id from localStorage:', admin_id);
+      
+      // Ưu tiên sử dụng admin_id nếu có, nếu không thì dùng account_id
+      if (admin_id) {
+        const adminIdInput = document.getElementById('adminIdInput');
+        if (adminIdInput) {
+          adminIdInput.value = admin_id;
+          console.log('Set admin_id in form from admin_id:', adminIdInput.value);
+        }
+      } else if (account_id) {
+        const adminIdInput = document.getElementById('adminIdInput');
+        if (adminIdInput) {
+          adminIdInput.value = account_id;
+          console.log('Set admin_id in form from account_id:', adminIdInput.value);
+        }
+      } else {
+        console.warn('Neither admin_id nor account_id found in localStorage');
+        showMessage('error', 'Không tìm thấy admin_id hoặc account_id. Vui lòng đăng nhập lại!');
+      }
+      
+      // Cấu hình form action
+      const postForm = document.getElementById('postForm');
+      const postIdInput = document.getElementById('postIdInput');
+      
+      if (postForm && post_id) {
+        // Cập nhật action URL cho form - sử dụng đường dẫn tuyệt đối bắt đầu bằng /
+        postForm.action = `/post/${post_id}`;
+        console.log('Đã cập nhật action URL cho form:', postForm.action);
+        
+        // Debug: kiểm tra endpoint được gọi
+        console.log('Form hiện tại:', {
+          action: postForm.action,
+          method: postForm.method,
+          enctype: postForm.enctype
+        });
+        
+        // Cập nhật post_id hidden input
+        if (postIdInput) {
+          postIdInput.value = post_id;
+          console.log('Đã cập nhật post_id input:', postIdInput.value);
+        }
+      }
+      
+      // Thiết lập nút Cancel
+      const cancelButton = document.getElementById('cancelButton');
+      if (cancelButton) {
+        cancelButton.addEventListener('click', function() {
+          if (confirm('Bạn có chắc muốn hủy chỉnh sửa bài viết này?')) {
+            // Quay lại trang danh sách bài viết
+            window.location.href = '/posts';
+          }
+        });
+      }
+      
+      // Thiết lập nút Delete
+      const deleteButton = document.getElementById('deleteButton');
+      if (deleteButton && post_id) {
+        deleteButton.setAttribute('data-post-id', post_id);
+        
+        deleteButton.addEventListener('click', function() {
+          // Lấy post_id từ data attribute
+          const postId = this.getAttribute('data-post-id');
+          console.log('Xóa bài viết với post_id:', postId);
+          
+          // Debug thông tin
+          console.log('Thông tin nút Delete:', {
+            'data-post-id': this.getAttribute('data-post-id'),
+            'localStorage post_id': localStorage.getItem('current_post_id')
+          });
+          
+          if (confirm('Bạn có chắc chắn muốn xóa bài viết này?')) {
+            // Hiển thị loading
+            deleteButton.disabled = true;
+            deleteButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Đang xóa...';
+            
+            // Đảm bảo URL đúng định dạng cho API xóa - sửa từ /posts sang /post/:post_id
+            // Sử dụng URL tuyệt đối để tránh lỗi đường dẫn
+            const deleteUrl = `/post/${postId}`;
+            console.log('Chuẩn bị gọi API DELETE với URL:', deleteUrl);
+            
+            // Gửi request DELETE
+            fetch(deleteUrl, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              }
+            })
+            .then(response => {
+              console.log('Delete response status:', response.status);
+              console.log('Delete response URL:', response.url);
+              
+              // Kiểm tra response status trước khi parse JSON
+              if (response.status >= 200 && response.status < 300) {
+                return response.json().catch(() => {
+                  // Nếu không thể parse JSON nhưng status là success, vẫn coi là thành công
+                  return { success: true, message: 'Xóa bài viết thành công!' };
+                });
+              } else {
+                throw new Error(`HTTP error! status: ${response.status}, URL: ${response.url}`);
+              }
+            })
+            .then(data => {
+              console.log('Delete response data:', data);
+              // Hiển thị thông báo thành công
+              alert(data.message || 'Xóa bài viết thành công!');
+              
+              // Log thông tin trước khi redirect
+              console.log('Current URL:', window.location.href);
+              console.log('Redirect to URL:', '/posts');
+              
+              // Chuyển về trang danh sách bài viết - sử dụng đường dẫn tuyệt đối
+              window.location.href = '/posts';
+            })
+            .catch(error => {
+              console.error('Error deleting post:', error);
+              
+              // Khôi phục nút delete
+              deleteButton.disabled = false;
+              deleteButton.innerHTML = 'Delete Post';
+              
+              // Hiển thị thông báo lỗi
+              alert('Đã xảy ra lỗi khi xóa bài viết: ' + error.message);
+              showMessage('error', 'Đã xảy ra lỗi khi xóa bài viết. Vui lòng thử lại.');
+            });
+          }
+        });
+      }
+      
+      // Hiển thị tên file được chọn
+      const imageInput = document.getElementById('postImage');
+      if (imageInput) {
+        imageInput.addEventListener('change', function() {
+          if (this.files.length > 0) {
+            const fileName = this.files[0].name;
+            const fileSize = Math.round(this.files[0].size / 1024); // kB
+            
+            // Hiển thị thông tin file
+            const fileInfo = document.createElement('div');
+            fileInfo.className = 'mt-2 text-muted small';
+            fileInfo.innerHTML = `File đã chọn: <strong>${fileName}</strong> (${fileSize}kB)`;
+            
+            // Xóa thông tin file cũ nếu có
+            const oldFileInfo = this.parentElement.querySelector('.text-muted.small:not(.form-text)');
+            if (oldFileInfo) {
+              oldFileInfo.remove();
+            }
+            
+            // Thêm thông tin file mới
+            this.parentElement.appendChild(fileInfo);
+            
+            // Hiển thị preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+              // Xóa preview cũ nếu có
+              const oldPreview = imageInput.parentElement.querySelector('.preview-container');
+              if (oldPreview) {
+                oldPreview.remove();
+              }
+              
+              // Tạo preview mới
+              const previewContainer = document.createElement('div');
+              previewContainer.className = 'preview-container mt-2';
+              
+              const previewImage = document.createElement('img');
+              previewImage.src = e.target.result;
+              previewImage.className = 'img-thumbnail';
+              previewImage.style.maxHeight = '200px';
+              
+              previewContainer.appendChild(previewImage);
+              imageInput.parentElement.appendChild(previewContainer);
+            };
+            reader.readAsDataURL(this.files[0]);
+          }
+        });
+      }
+      
+      // Form submit
+      if (postForm) {
+        postForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          
+          // Kiểm tra đầy đủ các trường bắt buộc
+          const title = document.getElementById('postTitle').value.trim();
+          const content = document.getElementById('postContent').value.trim();
+          const adminIdInput = document.getElementById('adminIdInput');
+          const postIdInput = document.getElementById('postIdInput');
+          
+          let hasError = false;
+          let errorMessage = '';
+          
+          if (!title) {
+            errorMessage = 'Vui lòng nhập tiêu đề bài viết';
+            hasError = true;
+          } else if (!content) {
+            errorMessage = 'Vui lòng nhập nội dung bài viết';
+            hasError = true;
+          } else if (!adminIdInput || !adminIdInput.value) {
+            errorMessage = 'Không thể cập nhật bài viết: admin_id không tồn tại. Vui lòng đăng nhập lại.';
+            hasError = true;
+          } else if (!postIdInput || !postIdInput.value) {
+            errorMessage = 'Không thể cập nhật bài viết: post_id không tồn tại.';
+            hasError = true;
+          }
+          
+          if (hasError) {
+            showMessage('error', errorMessage);
+            console.error('Form validation error:', errorMessage);
+            return;
+          }
+          
+          // Đảm bảo form action đúng định dạng
+          const postId = postIdInput.value;
+          const correctAction = `/post/${postId}`;
+          
+          // Cập nhật lại action URL nếu cần
+          if (postForm.action !== correctAction && postForm.action !== window.location.origin + correctAction) {
+            console.log('Đang cập nhật action URL từ', postForm.action, 'thành', correctAction);
+            postForm.action = correctAction;
+          }
+          
+          // Log thông tin gửi đi
+          console.log('Submit form với dữ liệu:');
+          console.log('- post_id:', postIdInput.value);
+          console.log('- admin_id:', adminIdInput.value);
+          console.log('- title:', title);
+          console.log('- content (length):', content.length, 'ký tự');
+          console.log('- action URL:', postForm.action);
+          console.log('- method:', postForm.method, '(với _method=PUT)');
+          
+          // Hiển thị loading
+          const submitBtn = postForm.querySelector('button[type="submit"]');
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Đang xử lý...';
+          }
+          
+          // Thay vì sử dụng XHR, hãy thử gửi form trực tiếp
+          const oldSubmit = postForm.onsubmit;
+          postForm.onsubmit = null; // Tạm thời xóa event handler hiện tại
+          
+          // Đảm bảo method-override hoạt động đúng
+          const methodInput = document.querySelector('input[name="_method"]');
+          if (methodInput) {
+            methodInput.value = 'PUT';
+          } else {
+            const hiddenMethod = document.createElement('input');
+            hiddenMethod.type = 'hidden';
+            hiddenMethod.name = '_method';
+            hiddenMethod.value = 'PUT';
+            postForm.appendChild(hiddenMethod);
+          }
+          
+          try {
+            console.log('Gửi form trực tiếp với action:', postForm.action);
+            postForm.submit();
+          } catch (err) {
+            console.error('Lỗi khi gửi form:', err);
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.innerHTML = 'Save Changes';
+            }
+            showMessage('error', 'Lỗi khi gửi form: ' + err.message);
+            postForm.onsubmit = oldSubmit; // Khôi phục event handler
+          }
+        });
+      }
+      
+      // Hàm điền thông tin bài viết vào form
+      function fillPostForm(postData) {
+        console.log('Điền thông tin bài viết vào form:', postData);
+        
+        // Điền tiêu đề
+        const titleInput = document.getElementById('postTitle');
+        if (titleInput && postData.title) {
+          titleInput.value = postData.title;
+          console.log('Đã điền tiêu đề:', postData.title);
+        }
+        
+        // Điền nội dung
+        const contentTextarea = document.getElementById('postContent');
+        if (contentTextarea && postData.content) {
+          contentTextarea.value = postData.content;
+          console.log('Đã điền nội dung từ API vào textarea:', postData.content.substring(0, 50) + '...');
+        }
+        
+        // Điền admin_id từ dữ liệu bài viết nếu có
+        if (postData.admin_id) {
+          const adminIdInput = document.getElementById('adminIdInput');
+          if (adminIdInput) {
+            adminIdInput.value = postData.admin_id;
+            console.log('Đã điền admin_id từ dữ liệu bài viết:', postData.admin_id);
+          }
+        }
+        
+        // Hiển thị hình ảnh hiện tại nếu có
+        if (postData.image) {
+          displayCurrentImage(postData.image);
+          console.log('Đã hiển thị hình ảnh:', postData.image);
+        }
+        
+        // Hiển thị metadata của bài viết
+        displayPostMetadata(postData);
+        console.log('Đã hiển thị metadata của bài viết');
+      }
+      
+      // Hàm hiển thị hình ảnh hiện tại
+      function displayCurrentImage(imageUrl) {
+        const container = document.getElementById('currentImageContainer');
+        if (!container) return;
+        
+        container.innerHTML = `
+          <p class="mb-1">Hình ảnh hiện tại:</p>
+          <img class="img-thumbnail" src="${imageUrl}" alt="Current image" style="max-height: 200px">
+        `;
+      }
+      
+      // Hàm hiển thị metadata của bài viết (created_at, updated_at)
+      function displayPostMetadata(post) {
+        // Tạo một div hiển thị metadata nếu chưa có
+        let metadataContainer = document.getElementById('postMetadataContainer');
+        if (!metadataContainer) {
+          const form = document.getElementById('postForm');
+          metadataContainer = document.createElement('div');
+          metadataContainer.id = 'postMetadataContainer';
+          metadataContainer.className = 'mt-3 mb-4 p-3 bg-light rounded';
+          form.insertAdjacentElement('afterbegin', metadataContainer);
+        }
+        
+        // Format thời gian
+        let createdDate = 'N/A';
+        let updatedDate = 'N/A';
+        
+        if (post.created_at || post.create_at) {
+          const createDate = new Date(post.created_at || post.create_at);
+          createdDate = createDate.toLocaleString('vi-VN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+        }
+        
+        if (post.updated_at || post.update_at) {
+          const updateDate = new Date(post.updated_at || post.update_at);
+          updatedDate = updateDate.toLocaleString('vi-VN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+        }
+        
+        // Hiển thị thông tin
+        metadataContainer.innerHTML = `
+          <div class="d-flex flex-column">
+            <small class="text-muted mb-1">
+              <strong>ID bài viết:</strong> ${post.post_id}
+            </small>
+            <small class="text-muted mb-1">
+              <strong>Ngày tạo:</strong> ${createdDate}
+            </small>
+            <small class="text-muted">
+              <strong>Cập nhật lần cuối:</strong> ${updatedDate}
+            </small>
+          </div>
+        `;
+      }
+      
+      // Hàm lấy thông tin bài viết từ API
+      async function fetchPostDetails(postId) {
+        try {
+          showMessage('info', 'Đang tải thông tin bài viết...');
+          console.log('Bắt đầu gọi API lấy chi tiết bài viết với post_id:', postId);
+          
+          const response = await fetch(`/post/details/${postId}`, {
+            headers: {
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Lỗi API: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          console.log('Dữ liệu bài viết từ API:', data);
+          
+          // Lấy thông tin bài viết (xử lý cả trường hợp là mảng hoặc object)
+          let post;
+          if (Array.isArray(data)) {
+            if (data.length === 0) {
+              throw new Error('Không có dữ liệu bài viết!');
+            }
+            post = data[0]; // Lấy phần tử đầu tiên nếu là mảng
+            console.log('Dữ liệu nhận được là mảng, sử dụng phần tử đầu tiên:', post);
+          } else {
+            post = data;
+            console.log('Dữ liệu nhận được là object:', post);
+          }
+          
+          if (!post) {
+            throw new Error('Không có dữ liệu bài viết!');
+          }
+          
+          // Log các trường quan trọng
+          console.log('Tiêu đề:', post.title);
+          console.log('Nội dung:', post.content ? post.content.substring(0, 50) + '...' : 'Không có');
+          console.log('Hình ảnh:', post.image || 'Không có');
+          
+          // Điền thông tin bài viết vào form
+          fillPostForm(post);
+          
+          // Lưu thông tin bài viết vào localStorage
+          localStorage.setItem('edit_post_data', JSON.stringify(post));
+          console.log('Đã lưu thông tin bài viết vào localStorage');
+          
+          // Xóa thông báo đang tải
+          document.getElementById('messageContainer').innerHTML = '';
+          
+          // Hiển thị metadata của bài viết
+          displayPostMetadata(post);
+          
+        } catch (error) {
+          console.error('Lỗi khi lấy chi tiết bài viết:', error);
+          showMessage('error', 'Không thể tải thông tin bài viết: ' + error.message);
+        }
+      }
+      
+      // Hàm hiển thị thông báo
+      function showMessage(type, message) {
+        // Xóa thông báo cũ nếu có
+        const messageContainer = document.getElementById('messageContainer');
+        if (!messageContainer) return;
+        
+        messageContainer.innerHTML = '';
+        
+        // Tạo thông báo mới
+        const alertDiv = document.createElement('div');
+        
+        // Xác định loại alert
+        if (type === 'success') {
+          alertDiv.className = 'alert alert-success';
+          alertDiv.innerHTML = `<i class="fas fa-check-circle me-2"></i>${message}`;
+        } else if (type === 'error') {
+          alertDiv.className = 'alert alert-danger';
+          alertDiv.innerHTML = `<i class="fas fa-exclamation-circle me-2"></i>${message}`;
+        } else if (type === 'info') {
+          alertDiv.className = 'alert alert-info';
+          alertDiv.innerHTML = `<i class="fas fa-info-circle me-2"></i>${message}`;
+        }
+        
+        // Thêm nút đóng thông báo
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'btn-close';
+        closeBtn.setAttribute('data-bs-dismiss', 'alert');
+        closeBtn.setAttribute('aria-label', 'Close');
+        closeBtn.style.float = 'right';
+        alertDiv.appendChild(closeBtn);
+        
+        // Chèn thông báo vào container
+        messageContainer.appendChild(alertDiv);
+        
+        // Tự động cuộn lên đầu để thấy thông báo
+        window.scrollTo(0, 0);
+      }
+    }); 

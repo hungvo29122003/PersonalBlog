@@ -1,0 +1,1319 @@
+extends ../layouts/layout
+
+block content
+  .container.py-5
+    .row.justify-content-center
+      .col-lg-10
+        if post
+          // Hiển thị flash messages
+          if messages && messages.success
+            .alert.alert-success.mb-4= messages.success
+          if messages && messages.error
+            .alert.alert-danger.mb-4= messages.error
+            
+          .card.border-0.shadow
+            if post.image
+              .post-featured-image
+                img.card-img-top(src=post.image alt=post.title)
+            
+            .card-body.p-5
+              h1.card-title.mb-3= post.title
+              
+              .post-meta.text-muted.mb-4
+                .d-flex.align-items-center
+                  i.fas.fa-user.me-2
+                  span= post.fullname || 'Admin'
+                  
+                  .ms-3.me-3 |
+                  
+                  i.far.fa-calendar-alt.me-2
+                  - const date = new Date(post.create_at)
+                  span= date.toLocaleDateString('vi-VN', { year: 'numeric', month: 'long', day: 'numeric' })
+              
+              .post-content.mb-5
+                != post.content.replace(/\n/g, '<br>')
+              
+              <div class="post-actions d-flex align-items-center mb-4">
+                <button class="btn btn-outline-primary me-3 like-button" data-post-id="${post.post_id}">
+                  <i class="far fa-thumbs-up me-2"></i>
+                  <span class="like-count">0</span> Thích
+                </button>
+                <div class="comment-count-container d-flex align-items-center">
+                  <i class="far fa-comment me-2"></i>
+                  <span class="comment-count">0</span> Bình luận
+                </div>
+              </div>
+              
+              <!-- Phần bình luận -->
+              <div class="post-comments mt-4">
+                <h4 class="mb-4">Bình luận</h4>
+                
+                <!-- Form thêm bình luận -->
+                <div class="comment-form-container card mb-4">
+                  <div class="card-body">
+                    <form id="comment-form" class="comment-form">
+                      <div class="mb-3">
+                        <textarea class="form-control" id="comment-content" rows="3" placeholder="Viết bình luận của bạn..." required></textarea>
+                      </div>
+                      <button type="submit" class="btn btn-primary">Gửi bình luận</button>
+                    </form>
+                  </div>
+                </div>
+                
+                <!-- Thông báo đăng nhập để bình luận -->
+                <div class="login-message-container card mb-4" style="display: none;">
+                  <div class="card-body text-center">
+                    <p class="mb-2">Bạn cần đăng nhập để bình luận</p>
+                    <a href="/auth/login" class="btn btn-primary">Đăng nhập</a>
+                  </div>
+                </div>
+                
+                <!-- Danh sách bình luận -->
+                <div id="comments-container" class="comments-list">
+                  <div class="text-center p-3">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Đang tải bình luận...</p>
+                  </div>
+                </div>
+              </div>
+              
+              .post-actions.border-top.pt-4.mt-4
+                .d-flex.justify-content-between
+                  a.btn.btn-outline-primary(href='/posts')
+                    i.fas.fa-arrow-left.me-2
+                    | Quay lại danh sách
+                  
+                  if user && user.role === 'admin'
+                    .btn-group
+                      a.btn.btn-primary(href=`/post/edit/${post.post_id}`)
+                        i.fas.fa-edit.me-2
+                        | Chỉnh sửa
+                      button.btn.btn-danger.delete-post-btn(type="button" data-post-id=post.post_id)
+                        i.fas.fa-trash.me-2
+                        | Xóa
+        
+        else
+          .alert.alert-warning
+            h4.alert-heading Không tìm thấy bài viết!
+            p Có thể bài viết đã bị xóa hoặc không tồn tại.
+            a.btn.btn-primary.mt-3(href='/posts') Quay lại danh sách bài viết
+
+block scripts
+  // Thêm thư viện SweetAlert2
+  script(src="https://cdn.jsdelivr.net/npm/sweetalert2@11")
+  
+  style.
+    /* CSS cho nút like */
+    .like-button {
+      transition: all 0.3s ease;
+      border-color: #0d6efd;
+      color: #0d6efd;
+    }
+    
+    .like-button:hover {
+      background-color: #0d6efd;
+      color: white;
+    }
+    
+    .like-button:hover i {
+      color: white;
+    }
+    
+    .like-button.liked {
+      background-color: #0d6efd;
+      color: white;
+      border-color: #0d6efd;
+    }
+    
+    .like-button.liked i {
+      color: white;
+    }
+    
+    .like-button.liked:hover {
+      background-color: #0b5ed7;
+      border-color: #0b5ed7;
+    }
+    
+    /* CSS cho bình luận */
+    .comments-list {
+      margin-top: 1.5rem;
+    }
+    
+    .comment-item {
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      border: 1px solid rgba(0,0,0,0.125);
+      transition: all 0.2s ease;
+    }
+    
+    .comment-item:hover {
+      box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+    }
+    
+    .comment-item .card-body {
+      padding: 1.25rem;
+    }
+    
+    /* CSS cho phản hồi */
+    .replies-container {
+      margin-top: 0.5rem;
+      padding-top: 0.5rem;
+      border-left: 3px solid #e9ecef !important;
+    }
+    
+    .reply-item {
+      background-color: #f8f9fa;
+      margin-bottom: 0.5rem !important;
+    }
+    
+    .reply-item .card-body {
+      padding: 0.75rem 1.25rem;
+    }
+    
+    /* CSS cho form phản hồi */
+    .reply-form-container {
+      background-color: #f8f9fa;
+      border-radius: 0.25rem;
+      padding: 0.75rem;
+    }
+    
+    /* Nút phản hồi */
+    .reply-button {
+      color: #6c757d;
+      text-decoration: none;
+    }
+    
+    .reply-button:hover {
+      color: #0d6efd;
+      text-decoration: underline;
+    }
+    
+    /* CSS cho số lượng bình luận */
+    .comment-count-container {
+      color: #6c757d;
+      font-size: 0.95rem;
+    }
+    
+    .comment-count {
+      font-weight: 600;
+      color: #495057;
+    }
+  
+  if post
+    script.
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOMContentLoaded - Kiểm tra trạng thái like ban đầu');
+        // Kiểm tra trạng thái like khi tải trang
+        checkLikeStatus();
+        
+        // Xử lý nút xóa bài viết
+        const deleteButtons = document.querySelectorAll('.delete-post-btn');
+        deleteButtons.forEach(button => {
+          button.addEventListener('click', function() {
+            const postId = this.getAttribute('data-post-id');
+            
+            if (confirm('Bạn có chắc chắn muốn xóa bài viết này?')) {
+              fetch(`/post/${postId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              })
+              .then(response => response.json())
+              .then(data => {
+                if (data.message) {
+                  alert(data.message);
+                  window.location.href = '/posts';
+                }
+              })
+              .catch(error => {
+                console.error('Error:', error);
+                alert('Đã xảy ra lỗi khi xóa bài viết.');
+              });
+            }
+          });
+        });
+        
+        // Xử lý nút like
+        const likeButton = document.querySelector('.like-button');
+        if (likeButton) {
+          console.log('Đã tìm thấy nút like:', likeButton);
+          console.log('Post ID của nút like:', likeButton.getAttribute('data-post-id'));
+          
+          likeButton.addEventListener('click', function() {
+            console.log('Nút like được nhấn');
+            const postId = this.getAttribute('data-post-id');
+            console.log('Post ID lấy được:', postId);
+            
+            const user_id = localStorage.getItem('user_id');
+            console.log('User ID từ localStorage:', user_id);
+            
+            if (!user_id) {
+              console.log('Không tìm thấy user_id, hiện thông báo yêu cầu đăng nhập');
+              Swal.fire({
+                title: 'Thông báo',
+                text: 'Bạn cần đăng nhập để thích bài viết!',
+                icon: 'warning',
+                confirmButtonText: 'Đăng nhập',
+                showCancelButton: true,
+                cancelButtonText: 'Hủy'
+              }).then((result) => {
+                if (result.isConfirmed) {
+                  console.log('Người dùng chọn đăng nhập, chuyển hướng đến trang login');
+                  window.location.href = '/auth/login';
+                } else {
+                  console.log('Người dùng hủy đăng nhập');
+                }
+              });
+              return;
+            }
+            
+            // Kiểm tra xem nút đã được like chưa
+            const isLiked = this.classList.contains('liked');
+            console.log('Trạng thái like hiện tại:', isLiked ? 'Đã like' : 'Chưa like');
+            
+            if (isLiked) {
+              // Nếu đã like, thực hiện unlike bằng cách gọi API
+              console.log('Thực hiện unlike (bỏ trạng thái thích) qua API');
+              
+              // Lấy like_id từ localStorage
+              const like_id = localStorage.getItem('like_id');
+              console.log('Like ID lấy được để unlike:', like_id);
+              
+              if (!like_id) {
+                console.log('Không tìm thấy like_id, không thể unlike');
+                Swal.fire({
+                  title: 'Lỗi!',
+                  text: 'Không thể bỏ thích bài viết: Không tìm thấy ID của lượt thích',
+                  icon: 'error',
+                  confirmButtonText: 'Đóng'
+                });
+                return;
+              }
+              
+              fetch(`/like/${like_id}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                  user_id: parseInt(user_id)
+                })
+              })
+              .then(response => {
+                console.log('Nhận được response từ API unlike:', response);
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                  console.log('Response không OK, xử lý lỗi');
+                  return response.json().then(data => {
+                    console.log('Dữ liệu lỗi nhận được:', data);
+                    throw new Error(data.message || `Lỗi API: ${response.status}`);
+                  });
+                }
+                console.log('Response OK, chuyển sang JSON');
+                return response.json();
+              })
+              .then(result => {
+                console.log('Kết quả unlike thành công:', result);
+                
+                // Cập nhật UI
+                console.log('Cập nhật UI: Xóa class liked khỏi nút');
+                this.classList.remove('liked');
+                console.log('Cập nhật UI: Đổi icon từ fas sang far');
+                this.querySelector('i').classList.remove('fas');
+                this.querySelector('i').classList.add('far');
+                
+                // Xóa user_id_like và like_id từ localStorage
+                console.log('Xóa user_id_like và like_id từ localStorage');
+                localStorage.removeItem('user_id_like');
+                localStorage.removeItem('like_id');
+                
+                // Hiển thị thông báo thành công
+                console.log('Hiển thị thông báo unlike thành công với message:', result.message);
+                Swal.fire({
+                  title: 'Đã bỏ thích!',
+                  text: result.message || 'Bạn đã bỏ thích bài viết này',
+                  icon: 'info',
+                  timer: 1500,
+                  showConfirmButton: false
+                });
+              })
+              .catch(error => {
+                console.error('Lỗi khi bỏ thích bài viết:', error);
+                console.log('Hiển thị thông báo lỗi');
+                Swal.fire({
+                  title: 'Lỗi!',
+                  text: 'Không thể bỏ thích bài viết: ' + error.message,
+                  icon: 'error',
+                  confirmButtonText: 'Đóng'
+                });
+              });
+              return;
+            }
+            
+            // Gọi API để like bài viết
+            console.log('Bắt đầu gọi API like với postId:', postId);
+            console.log('Dữ liệu gửi đi:', { user_id: parseInt(user_id) });
+            
+            fetch(`/like/${postId}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify({
+                user_id: parseInt(user_id)
+              })
+            })
+            .then(response => {
+              console.log('Nhận được response từ API:', response);
+              console.log('Response status:', response.status);
+              
+              if (!response.ok) {
+                console.log('Response không OK, xử lý lỗi');
+                return response.json().then(data => {
+                  console.log('Dữ liệu lỗi nhận được:', data);
+                  throw new Error(data.message || `Lỗi API: ${response.status}`);
+                });
+              }
+              console.log('Response OK, chuyển sang JSON');
+              return response.json();
+            })
+            .then(result => {
+              console.log('Kết quả like thành công:', result);
+              
+              // Cập nhật UI
+              console.log('Cập nhật UI: Thêm class liked cho nút');
+              this.classList.add('liked');
+              console.log('Cập nhật UI: Đổi icon từ far sang fas');
+              this.querySelector('i').classList.remove('far');
+              this.querySelector('i').classList.add('fas');
+              
+              // Lưu user_id vào localStorage với tên user_id_like
+              console.log('Lưu user_id vào localStorage với tên user_id_like:', user_id);
+              localStorage.setItem('user_id_like', user_id);
+              
+              // Lưu like_id vào localStorage nếu API trả về
+              if (result.like_id) {
+                console.log('Lưu like_id vào localStorage:', result.like_id);
+                localStorage.setItem('like_id', result.like_id);
+              }
+              
+              // Hiển thị thông báo thành công
+              console.log('Hiển thị thông báo thành công với message:', result.message);
+              Swal.fire({
+                title: 'Thành công!',
+                text: result.message || 'Bạn đã thích bài viết này',
+                icon: 'success',
+                timer: 1500,
+                showConfirmButton: false
+              });
+            })
+            .catch(error => {
+              console.error('Lỗi khi thích bài viết:', error);
+              console.log('Hiển thị thông báo lỗi');
+              Swal.fire({
+                title: 'Lỗi!',
+                text: 'Không thể thích bài viết: ' + error.message,
+                icon: 'error',
+                confirmButtonText: 'Đóng'
+              });
+            });
+          });
+        } else {
+          console.log('KHÔNG tìm thấy nút like trong DOM');
+        }
+        
+        // Hàm kiểm tra trạng thái like ban đầu
+        function checkLikeStatus() {
+          console.log('Kiểm tra trạng thái like ban đầu');
+          const likeButton = document.querySelector('.like-button');
+          if (!likeButton) {
+            console.log('Không tìm thấy nút like để kiểm tra trạng thái');
+            return;
+          }
+          
+          const user_id_like = localStorage.getItem('user_id_like');
+          const current_user_id = localStorage.getItem('user_id');
+          
+          console.log('user_id_like từ localStorage:', user_id_like);
+          console.log('current_user_id từ localStorage:', current_user_id);
+          
+          if (user_id_like && user_id_like === current_user_id) {
+            console.log('Người dùng đã like bài viết này, cập nhật UI');
+            likeButton.classList.add('liked');
+            likeButton.querySelector('i').classList.remove('far');
+            likeButton.querySelector('i').classList.add('fas');
+          } else {
+            console.log('Người dùng chưa like bài viết này hoặc đã đăng xuất');
+            likeButton.classList.remove('liked');
+            likeButton.querySelector('i').classList.remove('fas');
+            likeButton.querySelector('i').classList.add('far');
+          }
+        }
+      });
+  else
+    script.
+      // Chạy khi trang đã tải xong
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOMContentLoaded - Chuẩn bị tải dữ liệu');
+        // 1. Lấy post_id từ localStorage
+        const post_id = localStorage.getItem('current_post_id');
+        console.log('Đã lấy post_id từ localStorage:', post_id);
+        
+        if (!post_id) {
+          console.error('Không tìm thấy post_id trong localStorage!');
+          return;
+        }
+        
+        // Lấy thông tin người dùng từ account_id
+        console.log('Gọi hàm getUserInfo() để lấy thông tin người dùng');
+        getUserInfo();
+        
+        // 2. Gọi API để lấy chi tiết bài viết
+        console.log('Gọi hàm fetchPostDetails() để lấy chi tiết bài viết');
+        fetchPostDetails(post_id);
+        
+        // Hàm lấy thông tin người dùng từ account_id
+        async function getUserInfo() {
+          try {
+            // Lấy account_id từ localStorage
+            const account_id = localStorage.getItem('account_id');
+            console.log('Đã lấy account_id từ localStorage:', account_id);
+            
+            if (!account_id) {
+              console.log('Không tìm thấy account_id trong localStorage, người dùng có thể chưa đăng nhập');
+              return;
+            }
+            
+            // Gọi API để lấy thông tin người dùng
+            console.log('Đang gọi API lấy thông tin người dùng với account_id:', account_id);
+            const response = await fetch(`/user/${account_id}`, {
+              headers: {
+                'Accept': 'application/json'
+              }
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Lỗi API: ${response.status}`);
+            }
+            
+            // Xử lý dữ liệu trả về
+            const userData = await response.json();
+            console.log('Thông tin người dùng nhận được:', userData);
+            
+            // Lấy user_id từ dữ liệu trả về
+            const user_id = userData.user_id;
+            console.log('Đã lấy user_id từ API:', user_id);
+            
+            // Lưu user_id vào localStorage
+            localStorage.setItem('user_id', user_id);
+            console.log('Đã lưu user_id vào localStorage:', user_id);
+            
+            // Lưu thêm các thông tin khác nếu cần
+            if (userData.full_name) {
+              localStorage.setItem('user_name', userData.full_name);
+              console.log('Đã lưu user_name vào localStorage:', userData.full_name);
+            }
+            
+            return userData;
+          } catch (error) {
+            console.error('Lỗi khi lấy thông tin người dùng:', error);
+          }
+        }
+        
+        // Hàm gọi API lấy chi tiết bài viết
+        async function fetchPostDetails(postId) {
+          try {
+            console.log('Đang gọi API với post_id:', postId);
+            
+            // Gọi đến router.get('/details/:post_id', postController.getPostDetailsById)
+            const response = await fetch(`/post/details/${postId}`, {
+              headers: {
+                'Accept': 'application/json'
+              }
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Lỗi API: ${response.status}`);
+            }
+            
+            // Chuyển response thành JSON
+            const data = await response.json();
+            console.log('Dữ liệu JSON nhận được:', data);
+            
+            // Lấy thông tin bài viết (nếu là mảng thì lấy phần tử đầu tiên)
+            const post = Array.isArray(data) ? data[0] : data;
+            
+            if (!post) {
+              console.error('Không có dữ liệu bài viết!');
+              return;
+            }
+            
+            // Log từng trường dữ liệu để kiểm tra
+            console.log('title:', post.title);
+            console.log('content:', post.content);
+            console.log('image:', post.image);
+            console.log('created_at:', post.create_at || post.created_at);
+            
+            // Hiển thị dữ liệu lên UI
+            displayPostDetails(post);
+            
+            // Tải comments
+            loadComments(postId);
+          } catch (error) {
+            console.error('Lỗi khi lấy chi tiết bài viết:', error);
+          }
+        }
+        
+        // Hàm tải và hiển thị comments
+        async function loadComments(postId) {
+          try {
+            // Hiển thị trạng thái đang tải
+            const commentsContainer = document.getElementById('comments-container');
+            if (commentsContainer) {
+              commentsContainer.innerHTML = `
+                <div class="text-center p-3">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                  <p class="mt-2">Đang tải bình luận...</p>
+                </div>
+              `;
+            }
+            
+            // Gọi API lấy comments theo post_id
+            const response = await fetch(`/comment/${postId}`, {
+              headers: {
+                'Accept': 'application/json'
+              }
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Lỗi API: ${response.status}`);
+            }
+            
+            const comments = await response.json();
+            console.log('Danh sách bình luận từ API:', comments);
+            
+            // Cập nhật số lượng bình luận
+            updateCommentCount(postId);
+            
+            // API đã trả về cấu trúc có sẵn replies, nên không cần organizeComments nữa
+            // Hiển thị comments trực tiếp
+            displayComments(comments);
+            
+            // Thiết lập form bình luận
+            setupCommentForm(postId);
+          } catch (error) {
+            console.error('Lỗi khi tải bình luận:', error);
+            const commentsContainer = document.getElementById('comments-container');
+            if (commentsContainer) {
+              commentsContainer.innerHTML = `
+                <div class="alert alert-warning">
+                  <i class="fas fa-exclamation-triangle me-2"></i>
+                  Không thể tải bình luận: ${error.message}. Vui lòng thử lại sau.
+                </div>
+              `;
+            }
+          }
+        }
+        
+        // Hàm lấy và cập nhật số lượng bình luận
+        async function updateCommentCount(postId) {
+          try {
+            // Gọi API lấy số lượng bình luận theo router.get('/post/:post_id', commentController.getCommentByPostId1)
+            const response = await fetch(`/comment/post/${postId}`, {
+              headers: {
+                'Accept': 'application/json'
+              }
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Lỗi API: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Số lượng bình luận từ API:', data);
+            
+            // Cập nhật UI hiển thị số lượng bình luận
+            const commentCountElements = document.querySelectorAll('.comment-count');
+            commentCountElements.forEach(element => {
+              element.textContent = data || '0';
+            });
+            
+          } catch (error) {
+            console.error('Lỗi khi lấy số lượng bình luận:', error);
+            // Mặc định hiển thị 0 nếu có lỗi
+            const commentCountElements = document.querySelectorAll('.comment-count');
+            commentCountElements.forEach(element => {
+              element.textContent = '0';
+            });
+          }
+        }
+        
+        // Hiển thị danh sách comments
+        function displayComments(comments) {
+          const commentsContainer = document.getElementById('comments-container');
+          if (!commentsContainer) return;
+          
+          if (!comments || !Array.isArray(comments) || comments.length === 0) {
+            commentsContainer.innerHTML = `
+              <div class="text-center p-3">
+                <p class="text-muted">Chưa có bình luận nào. Hãy là người đầu tiên bình luận!</p>
+              </div>
+            `;
+            return;
+          }
+          
+          // Sắp xếp comments gốc theo thời gian mới nhất
+          const sortedComments = [...comments].sort((a, b) => 
+            new Date(b.created_at || b.create_at) - new Date(a.created_at || a.create_at)
+          );
+          
+          let commentsHTML = '';
+          
+          // Tạo HTML cho từng bình luận gốc và các phản hồi con
+          sortedComments.forEach(comment => {
+            commentsHTML += createCommentHTML(comment);
+          });
+          
+          commentsContainer.innerHTML = commentsHTML;
+        }
+        
+        // Tạo HTML cho một bình luận và các phản hồi con
+        function createCommentHTML(comment) {
+          const date = new Date(comment.created_at || comment.create_at);
+          const formattedDate = date.toLocaleDateString('vi-VN', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          
+          // Hiển thị tên người dùng hoặc dùng "User #ID" nếu không có tên
+          const commenterName = comment.full_name || comment.username || `User #${comment.user_id}`;
+          
+          // Xác định class CSS cho bình luận dựa vào level (phản hồi hay không)
+          const isReply = comment.parent_id !== null;
+          const commentClass = isReply ? 'comment-item reply-item card mb-2' : 'comment-item card mb-3';
+          
+          let html = `
+            <div class="${commentClass}" data-comment-id="${comment.comment_id}">
+              <div class="card-body ${isReply ? 'py-3' : ''}">
+                <div class="d-flex justify-content-between">
+                  <h6 class="card-subtitle mb-2 fw-bold">${commenterName}</h6>
+                  <small class="text-muted">${formattedDate}</small>
+                </div>
+                <p class="card-text mt-2">${comment.content}</p>
+                <div class="mt-2 d-flex justify-content-between align-items-center">
+                  <button class="btn btn-sm btn-link reply-button p-0" data-comment-id="${comment.comment_id}">
+                    <i class="fas fa-reply me-1"></i> Phản hồi
+                  </button>
+                  <small class="text-muted comment-id" style="display:none;">ID: ${comment.comment_id}</small>
+                </div>
+                
+                <!-- Form phản hồi (ẩn mặc định) -->
+                <div class="reply-form-container mt-3" style="display: none;" id="reply-form-${comment.comment_id}">
+                  <form class="reply-form" data-parent-id="${comment.comment_id}">
+                    <div class="input-group">
+                      <textarea class="form-control form-control-sm" placeholder="Viết phản hồi..." rows="2" required></textarea>
+                      <button class="btn btn-primary btn-sm" type="submit">Gửi</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+              
+              <!-- Phần hiển thị các phản hồi -->
+              ${comment.replies && comment.replies.length > 0 ? generateRepliesHTML(comment.replies) : ''}
+            </div>
+          `;
+          
+          return html;
+        }
+        
+        // Hàm tạo HTML cho các phản hồi
+        function generateRepliesHTML(replies) {
+          if (!replies || replies.length === 0) return '';
+          
+          // Sắp xếp phản hồi theo thời gian, mới nhất lên trên
+          const sortedReplies = [...replies].sort((a, b) => 
+            new Date(a.created_at || a.create_at) - new Date(b.created_at || b.create_at)
+          );
+          
+          return `
+            <div class="replies-container ms-4 ps-2 border-start">
+              ${sortedReplies.map(reply => createCommentHTML(reply)).join('')}
+            </div>
+          `;
+        }
+        
+        // Hàm thiết lập form bình luận
+        function setupCommentForm(postId) {
+          const commentForm = document.getElementById('comment-form');
+          if (!commentForm) return;
+          
+          // Kiểm tra user_id trong localStorage
+          const user_id = localStorage.getItem('user_id');
+          const commentFormContainer = document.querySelector('.comment-form-container');
+          const loginMessageContainer = document.querySelector('.login-message-container');
+          
+          if (!user_id) {
+            // Nếu chưa đăng nhập, ẩn form bình luận và hiện thông báo đăng nhập
+            if (commentFormContainer) commentFormContainer.style.display = 'none';
+            if (loginMessageContainer) loginMessageContainer.style.display = 'block';
+          } else {
+            // Nếu đã đăng nhập, hiện form bình luận và ẩn thông báo đăng nhập
+            if (commentFormContainer) commentFormContainer.style.display = 'block';
+            if (loginMessageContainer) loginMessageContainer.style.display = 'none';
+          }
+          
+          commentForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const commentContent = document.getElementById('comment-content').value.trim();
+            if (!commentContent) return;
+            
+            try {
+              console.log('Đang gửi bình luận cho bài viết ID:', postId);
+              console.log('Nội dung bình luận:', commentContent);
+              console.log('User ID:', user_id);
+              
+              // Tạo dữ liệu bình luận để gửi đi
+              const commentData = {
+                post_id: postId,
+                user_id: parseInt(user_id),
+                parent_id: null,
+                content: commentContent
+              };
+              
+              console.log('Dữ liệu bình luận gửi đi:', commentData);
+              
+              // Gọi API thêm bình luận
+              const response = await fetch('/comment', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json'
+                },
+                body: JSON.stringify(commentData)
+              });
+              
+              if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `Lỗi API: ${response.status}`);
+              }
+              
+              const result = await response.json();
+              console.log('Kết quả thêm bình luận:', result);
+              
+              // Reset form
+              commentForm.reset();
+              
+              // Hiển thị thông báo
+              alert('Bình luận của bạn đã được gửi thành công!');
+              
+              // Tải lại danh sách bình luận
+              loadComments(postId);
+              
+              // Cập nhật số lượng bình luận
+              updateCommentCount(postId);
+            } catch (error) {
+              console.error('Lỗi khi gửi bình luận:', error);
+              alert('Không thể gửi bình luận: ' + error.message);
+            }
+          });
+          
+          // Thiết lập các nút phản hồi
+          document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('reply-button') || 
+                e.target.closest('.reply-button')) {
+              const button = e.target.classList.contains('reply-button') ? 
+                e.target : e.target.closest('.reply-button');
+              const commentId = button.getAttribute('data-comment-id');
+              console.log('Phản hồi bình luận với comment_id:', commentId);
+              
+              // Lưu comment_id hiện tại vào sessionStorage để dễ debug
+              sessionStorage.setItem('current_reply_to', commentId);
+              
+              const formContainer = document.getElementById(`reply-form-${commentId}`);
+              
+              if (formContainer) {
+                formContainer.style.display = formContainer.style.display === 'none' ? 'block' : 'none';
+                
+                // Nếu form được hiển thị, focus vào textarea
+                if (formContainer.style.display === 'block') {
+                  const textarea = formContainer.querySelector('textarea');
+                  if (textarea) {
+                    textarea.focus();
+                  }
+                }
+              }
+            }
+          });
+          
+          // Thiết lập xử lý form phản hồi
+          document.addEventListener('submit', function(e) {
+            if (e.target.classList.contains('reply-form')) {
+              e.preventDefault();
+              const parentId = e.target.getAttribute('data-parent-id');
+              const content = e.target.querySelector('textarea').value.trim();
+              
+              if (content) {
+                console.log('Đang gửi phản hồi cho bình luận ID:', parentId);
+                console.log('Nội dung phản hồi:', content);
+                
+                // Lấy user_id từ localStorage
+                const user_id = localStorage.getItem('user_id');
+                if (!user_id) {
+                  alert('Bạn cần đăng nhập để phản hồi bình luận!');
+                  return;
+                }
+                
+                // Tạo dữ liệu phản hồi để gửi đi
+                const replyData = {
+                  post_id: postId,
+                  user_id: parseInt(user_id),
+                  parent_id: parseInt(parentId),
+                  content: content
+                };
+                
+                console.log('Dữ liệu phản hồi gửi đi đến API /comment:', replyData);
+                console.log('- post_id:', replyData.post_id);
+                console.log('- user_id:', replyData.user_id);
+                console.log('- parent_id:', replyData.parent_id, '(comment_id của bình luận đang phản hồi)');
+                console.log('- content:', replyData.content);
+                
+                // Gọi API thêm phản hồi
+                fetch('/comment', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                  },
+                  body: JSON.stringify(replyData)
+                })
+                .then(response => {
+                  if (!response.ok) {
+                    return response.json().then(data => {
+                      throw new Error(data.message || `Lỗi API: ${response.status}`);
+                    });
+                  }
+                  return response.json();
+                })
+                .then(result => {
+                  console.log('Kết quả thêm phản hồi:', result);
+                  
+                  // Reset form
+                  e.target.reset();
+                  
+                  // Ẩn form
+                  e.target.closest('.reply-form-container').style.display = 'none';
+                  
+                  // Hiển thị thông báo
+                  alert('Phản hồi của bạn đã được gửi thành công!');
+                  
+                  // Tải lại danh sách bình luận
+                  loadComments(postId);
+                  
+                  // Cập nhật số lượng bình luận
+                  updateCommentCount(postId);
+                })
+                .catch(error => {
+                  console.error('Lỗi khi gửi phản hồi:', error);
+                  alert('Không thể gửi phản hồi: ' + error.message);
+                });
+              }
+            }
+          });
+        }
+        
+        // Hàm hiển thị dữ liệu bài viết lên UI
+        function displayPostDetails(post) {
+          console.log('Bắt đầu hiển thị dữ liệu bài viết lên UI');
+          const container = document.querySelector('.container.py-5 .row.justify-content-center .col-lg-10');
+          if (!container) {
+            console.error('Không tìm thấy container!');
+            return;
+          }
+          
+          console.log('Tìm thấy container, chuẩn bị hiển thị dữ liệu');
+          
+          // Xóa thông báo lỗi nếu có
+          const warningAlert = container.querySelector('.alert.alert-warning');
+          if (warningAlert) {
+            console.log('Xóa thông báo lỗi');
+            warningAlert.remove();
+          }
+          
+          console.log('Tạo HTML cho card bài viết');
+          // Tạo HTML cho card bài viết
+          const postCard = document.createElement('div');
+          postCard.className = 'card border-0 shadow';
+          
+          // Format ngày tháng
+          const date = new Date(post.create_at || post.created_at);
+          const formattedDate = date.toLocaleDateString('vi-VN', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          });
+          
+          // Tạo HTML
+          postCard.innerHTML = `
+            ${post.image ? `
+              <div class="post-featured-image">
+                <img class="card-img-top" src="${post.image}" alt="${post.title}">
+              </div>
+            ` : ''}
+            
+            <div class="card-body p-5">
+              <h1 class="card-title mb-3">${post.title}</h1>
+              
+              <div class="post-meta text-muted mb-4">
+                <div class="d-flex align-items-center">
+                  <i class="fas fa-user me-2"></i>
+                  <span>${post.fullname || 'Admin'}</span>
+                  
+                  <div class="ms-3 me-3">|</div>
+                  
+                  <i class="far fa-calendar-alt me-2"></i>
+                  <span>${formattedDate}</span>
+                </div>
+              </div>
+              
+              <div class="post-content mb-5">
+                ${post.content.replace(/\n/g, '<br>')}
+              </div>
+              
+              <div class="post-actions d-flex align-items-center mb-4">
+                <button class="btn btn-outline-primary me-3 like-button" data-post-id="${post.post_id}">
+                  <i class="far fa-thumbs-up me-2"></i>
+                  <span class="like-count">0</span> Thích
+                </button>
+                <div class="comment-count-container d-flex align-items-center">
+                  <i class="far fa-comment me-2"></i>
+                  <span class="comment-count">0</span> Bình luận
+                </div>
+              </div>
+              
+              <!-- Phần bình luận -->
+              <div class="post-comments mt-4">
+                <h4 class="mb-4">Bình luận</h4>
+                
+                <!-- Form thêm bình luận -->
+                <div class="comment-form-container card mb-4">
+                  <div class="card-body">
+                    <form id="comment-form" class="comment-form">
+                      <div class="mb-3">
+                        <textarea class="form-control" id="comment-content" rows="3" placeholder="Viết bình luận của bạn..." required></textarea>
+                      </div>
+                      <button type="submit" class="btn btn-primary">Gửi bình luận</button>
+                    </form>
+                  </div>
+                </div>
+                
+                <!-- Thông báo đăng nhập để bình luận -->
+                <div class="login-message-container card mb-4" style="display: none;">
+                  <div class="card-body text-center">
+                    <p class="mb-2">Bạn cần đăng nhập để bình luận</p>
+                    <a href="/auth/login" class="btn btn-primary">Đăng nhập</a>
+                  </div>
+                </div>
+                
+                <!-- Danh sách bình luận -->
+                <div id="comments-container" class="comments-list">
+                  <div class="text-center p-3">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Đang tải bình luận...</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="post-actions border-top pt-4 mt-4">
+                <div class="d-flex justify-content-between">
+                  <a class="btn btn-outline-primary" href="/posts">
+                    <i class="fas fa-arrow-left me-2"></i>
+                    Quay lại danh sách
+                  </a>
+                </div>
+              </div>
+            </div>
+          `;
+          
+          console.log('Thêm card vào container');
+          // Thêm card vào container
+          container.appendChild(postCard);
+          
+          console.log('Cập nhật tiêu đề trang');
+          // Cập nhật tiêu đề trang
+          document.title = post.title || 'Chi tiết bài viết';
+          
+          console.log('Cập nhật số lượng bình luận');
+          // Cập nhật số lượng bình luận
+          updateCommentCount(post.post_id);
+          
+          // Thiết lập xử lý nút like
+          console.log('Thiết lập xử lý nút like');
+          setupLikeButton();
+        }
+        
+        // Hàm thiết lập nút like
+        function setupLikeButton() {
+          console.log('Bắt đầu thiết lập nút like');
+          const likeButton = document.querySelector('.like-button');
+          if (likeButton) {
+            console.log('Đã tìm thấy nút like:', likeButton);
+            console.log('Post ID của nút like:', likeButton.getAttribute('data-post-id'));
+            
+            // Kiểm tra user_id từ localStorage
+            const user_id = localStorage.getItem('user_id');
+            
+            // Nếu không có user_id, hiển thị thông báo đăng nhập khi click
+            if (!user_id) {
+              console.log('Chưa đăng nhập, thêm xử lý hiển thị thông báo đăng nhập');
+              likeButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('Nút like được nhấn khi chưa đăng nhập');
+                Swal.fire({
+                  title: 'Thông báo',
+                  text: 'Bạn cần đăng nhập để thích bài viết!',
+                  icon: 'warning',
+                  confirmButtonText: 'Đăng nhập',
+                  showCancelButton: true,
+                  cancelButtonText: 'Hủy'
+                }).then((result) => {
+                  if (result.isConfirmed) {
+                    console.log('Người dùng chọn đăng nhập, chuyển hướng đến trang login');
+                    window.location.href = '/auth/login';
+                  }
+                });
+              });
+              return;
+            }
+            
+            // Kiểm tra trạng thái like ban đầu
+            checkLikeStatus();
+            
+            likeButton.addEventListener('click', function() {
+              console.log('Nút like được nhấn');
+              const postId = this.getAttribute('data-post-id');
+              console.log('Post ID lấy được:', postId);
+              
+              const user_id = localStorage.getItem('user_id');
+              console.log('User ID từ localStorage:', user_id);
+              
+              if (!user_id) {
+                console.log('Không tìm thấy user_id, hiện thông báo yêu cầu đăng nhập');
+                Swal.fire({
+                  title: 'Thông báo',
+                  text: 'Bạn cần đăng nhập để thích bài viết!',
+                  icon: 'warning',
+                  confirmButtonText: 'Đăng nhập',
+                  showCancelButton: true,
+                  cancelButtonText: 'Hủy'
+                }).then((result) => {
+                  if (result.isConfirmed) {
+                    console.log('Người dùng chọn đăng nhập, chuyển hướng đến trang login');
+                    window.location.href = '/auth/login';
+                  } else {
+                    console.log('Người dùng hủy đăng nhập');
+                  }
+                });
+                return;
+              }
+              
+              // Kiểm tra xem nút đã được like chưa
+              const isLiked = this.classList.contains('liked');
+              console.log('Trạng thái like hiện tại:', isLiked ? 'Đã like' : 'Chưa like');
+              
+              if (isLiked) {
+                // Nếu đã like, thực hiện unlike bằng cách gọi API
+                console.log('Thực hiện unlike (bỏ trạng thái thích) qua API');
+                
+                // Lấy like_id từ localStorage
+                const like_id = localStorage.getItem('like_id');
+                console.log('Like ID lấy được để unlike:', like_id);
+                
+                if (!like_id) {
+                  console.log('Không tìm thấy like_id, không thể unlike');
+                  Swal.fire({
+                    title: 'Lỗi!',
+                    text: 'Không thể bỏ thích bài viết: Không tìm thấy ID của lượt thích',
+                    icon: 'error',
+                    confirmButtonText: 'Đóng'
+                  });
+                  return;
+                }
+                
+                fetch(`/like/${like_id}`, {
+                  method: 'DELETE',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    user_id: parseInt(user_id)
+                  })
+                })
+                .then(response => {
+                  console.log('Nhận được response từ API unlike:', response);
+                  console.log('Response status:', response.status);
+                  
+                  if (!response.ok) {
+                    console.log('Response không OK, xử lý lỗi');
+                    return response.json().then(data => {
+                      console.log('Dữ liệu lỗi nhận được:', data);
+                      throw new Error(data.message || `Lỗi API: ${response.status}`);
+                    });
+                  }
+                  console.log('Response OK, chuyển sang JSON');
+                  return response.json();
+                })
+                .then(result => {
+                  console.log('Kết quả unlike thành công:', result);
+                  
+                  // Cập nhật UI
+                  console.log('Cập nhật UI: Xóa class liked khỏi nút');
+                  this.classList.remove('liked');
+                  console.log('Cập nhật UI: Đổi icon từ fas sang far');
+                  this.querySelector('i').classList.remove('fas');
+                  this.querySelector('i').classList.add('far');
+                  
+                  // Xóa user_id_like và like_id từ localStorage
+                  console.log('Xóa user_id_like và like_id từ localStorage');
+                  localStorage.removeItem('user_id_like');
+                  localStorage.removeItem('like_id');
+                  
+                  // Hiển thị thông báo thành công
+                  console.log('Hiển thị thông báo unlike thành công với message:', result.message);
+                  Swal.fire({
+                    title: 'Đã bỏ thích!',
+                    text: result.message || 'Bạn đã bỏ thích bài viết này',
+                    icon: 'info',
+                    timer: 1500,
+                    showConfirmButton: false
+                  });
+                })
+                .catch(error => {
+                  console.error('Lỗi khi bỏ thích bài viết:', error);
+                  console.log('Hiển thị thông báo lỗi');
+                  Swal.fire({
+                    title: 'Lỗi!',
+                    text: 'Không thể bỏ thích bài viết: ' + error.message,
+                    icon: 'error',
+                    confirmButtonText: 'Đóng'
+                  });
+                });
+                return;
+              }
+              
+              // Gọi API để like bài viết
+              console.log('Bắt đầu gọi API like với postId:', postId);
+              console.log('Dữ liệu gửi đi:', { user_id: parseInt(user_id) });
+              
+              fetch(`/like/${postId}`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                  user_id: parseInt(user_id)
+                })
+              })
+              .then(response => {
+                console.log('Nhận được response từ API:', response);
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                  console.log('Response không OK, xử lý lỗi');
+                  return response.json().then(data => {
+                    console.log('Dữ liệu lỗi nhận được:', data);
+                    throw new Error(data.message || `Lỗi API: ${response.status}`);
+                  });
+                }
+                console.log('Response OK, chuyển sang JSON');
+                return response.json();
+              })
+              .then(result => {
+                console.log('Kết quả like thành công:', result);
+                
+                // Cập nhật UI
+                console.log('Cập nhật UI: Thêm class liked cho nút');
+                this.classList.add('liked');
+                console.log('Cập nhật UI: Đổi icon từ far sang fas');
+                this.querySelector('i').classList.remove('far');
+                this.querySelector('i').classList.add('fas');
+                
+                // Lưu user_id vào localStorage với tên user_id_like
+                console.log('Lưu user_id vào localStorage với tên user_id_like:', user_id);
+                localStorage.setItem('user_id_like', user_id);
+                
+                // Lưu like_id vào localStorage nếu API trả về
+                if (result.like_id) {
+                  console.log('Lưu like_id vào localStorage:', result.like_id);
+                  localStorage.setItem('like_id', result.like_id);
+                }
+                
+                // Hiển thị thông báo thành công
+                console.log('Hiển thị thông báo thành công với message:', result.message);
+                Swal.fire({
+                  title: 'Thành công!',
+                  text: result.message || 'Bạn đã thích bài viết này',
+                  icon: 'success',
+                  timer: 1500,
+                  showConfirmButton: false
+                });
+              })
+              .catch(error => {
+                console.error('Lỗi khi thích bài viết:', error);
+                console.log('Hiển thị thông báo lỗi');
+                Swal.fire({
+                  title: 'Lỗi!',
+                  text: 'Không thể thích bài viết: ' + error.message,
+                  icon: 'error',
+                  confirmButtonText: 'Đóng'
+                });
+              });
+            });
+          } else {
+            console.log('KHÔNG tìm thấy nút like trong DOM');
+          }
+        }
+        
+        // Hàm kiểm tra trạng thái like ban đầu
+        function checkLikeStatus() {
+          console.log('Kiểm tra trạng thái like ban đầu');
+          const likeButton = document.querySelector('.like-button');
+          if (!likeButton) {
+            console.log('Không tìm thấy nút like để kiểm tra trạng thái');
+            return;
+          }
+          
+          const user_id_like = localStorage.getItem('user_id_like');
+          const current_user_id = localStorage.getItem('user_id');
+          
+          console.log('user_id_like từ localStorage:', user_id_like);
+          console.log('current_user_id từ localStorage:', current_user_id);
+          
+          if (user_id_like && user_id_like === current_user_id) {
+            console.log('Người dùng đã like bài viết này, cập nhật UI');
+            likeButton.classList.add('liked');
+            likeButton.querySelector('i').classList.remove('far');
+            likeButton.querySelector('i').classList.add('fas');
+          } else {
+            console.log('Người dùng chưa like bài viết này hoặc đã đăng xuất');
+            likeButton.classList.remove('liked');
+            likeButton.querySelector('i').classList.remove('fas');
+            likeButton.querySelector('i').classList.add('far');
+          }
+        }
+      });

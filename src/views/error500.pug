@@ -1,0 +1,28 @@
+extends layouts/layout
+
+block content
+  .row.justify-content-center.mt-5
+    .col-md-8.text-center
+      .mb-4
+        i.fas.fa-exclamation-triangle.text-danger.fa-5x
+      
+      h1.display-4 Server Error
+      p.lead We're sorry, but something went wrong on our server.
+      
+      .mt-4
+        p Our team has been notified about this issue and we're working to fix it as soon as possible.
+        p Please try again later or return to the home page.
+      
+      if error && Object.keys(error).length > 0
+        .card.mt-4.bg-light
+          .card-header Technical Details
+          .card-body
+            pre.mb-0= JSON.stringify(error, null, 2)
+      
+      .mt-5
+        a.btn.btn-primary.me-2(href="/") 
+          i.fas.fa-home.me-1
+          | Back to Home
+        button.btn.btn-outline-secondary(onclick="window.history.back()")
+          i.fas.fa-arrow-left.me-1
+          | Go Back 
