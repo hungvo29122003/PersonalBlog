@@ -36,7 +36,7 @@
 
 1. Clone repository:
 
-git clone https://github.com/hungvo29122003/PersonalBlog.git
+git clone https://github.com/hungvo29122003/PersonalBlog.git  
 cd PersonalBlog
 
 
